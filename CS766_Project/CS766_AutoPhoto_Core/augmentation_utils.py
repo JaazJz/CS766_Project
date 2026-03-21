@@ -188,16 +188,62 @@ def _unsharp_mask(image, sigma=1.2, amount=0.45):
     return np.clip(image + amount * (image - base), 0.0, 1.0)
 
 
-def preserve_subject_focus(original, refocused, subject_mask):
-    """Keep the chosen subject crisp while allowing the background to stay defocused."""
+def _soft_subject_mask(subject_mask):
     mask = normalize_map(subject_mask)
     mask = np.clip((mask - 0.12) / 0.50, 0.0, 1.0)
-    mask = cv2.GaussianBlur(mask.astype(np.float32), (0, 0), 9.0)
+    return cv2.GaussianBlur(mask.astype(np.float32), (0, 0), 9.0)
+
+
+def _subject_center(subject_mask):
+    mask = _soft_subject_mask(subject_mask)
+    height, width = mask.shape
+    total = float(mask.sum())
+    if total < 1e-6:
+        return width / 2.0, height / 2.0
+
+    yy, xx = np.mgrid[0:height, 0:width].astype(np.float32)
+    center_x = float((xx * mask).sum() / total)
+    center_y = float((yy * mask).sum() / total)
+    return center_x, center_y
+
+
+def preserve_subject_focus(original, refocused, subject_mask):
+    """Keep the chosen subject crisp while allowing the background to stay defocused."""
+    mask = _soft_subject_mask(subject_mask)
     mask = mask[:, :, np.newaxis]
 
     crisp_subject = _unsharp_mask(original, sigma=1.0, amount=0.35)
     protected = refocused * (1.0 - mask) + crisp_subject * mask
     return np.clip(protected, 0.0, 1.0)
+
+
+def enhance_subject_separation(image, subject_mask):
+    """Push the eye toward the subject with softer background and a subtle vignette."""
+    mask = _soft_subject_mask(subject_mask)
+    mask3 = mask[:, :, np.newaxis]
+
+    background_soft = cv2.GaussianBlur(image, (0, 0), 2.4)
+    background_weight = np.clip((1.0 - mask) ** 1.6 * 0.55, 0.0, 0.55)
+    separated = image * (1.0 - background_weight[:, :, np.newaxis]) + background_soft * background_weight[:, :, np.newaxis]
+
+    center_x, center_y = _subject_center(subject_mask)
+    height, width = mask.shape
+    yy, xx = np.mgrid[0:height, 0:width].astype(np.float32)
+    dx = (xx - center_x) / max(width * 0.42, 1.0)
+    dy = (yy - center_y) / max(height * 0.42, 1.0)
+    radial = np.sqrt(dx * dx + dy * dy)
+    vignette = np.clip(1.04 - 0.16 * radial, 0.84, 1.04)
+    vignette = vignette[:, :, np.newaxis]
+
+    subject_lift = 1.0 + 0.06 * mask3
+    return np.clip(separated * vignette * subject_lift, 0.0, 1.0)
+
+
+def create_augmented_image(original, refocused, subject_mask):
+    """Final subject-aware render used by the demo and CLI pipeline."""
+    protected = preserve_subject_focus(original, refocused, subject_mask)
+    separated = enhance_subject_separation(protected, subject_mask)
+    return apply_style_enhancement(separated, subject_mask)
 
 
 def apply_style_enhancement(image, subject_mask=None):

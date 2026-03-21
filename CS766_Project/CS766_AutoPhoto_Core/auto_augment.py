@@ -12,6 +12,7 @@ import config
 from augmentation_utils import (
     ASPECT_RATIOS,
     apply_style_enhancement,
+    create_augmented_image,
     compute_crop_box,
     compute_subject_saliency,
     create_overlay,
@@ -82,7 +83,7 @@ def run_auto_augment(image_path, output_dir, aspect, skip_refocus, skip_enhance)
     if skip_enhance:
         final_image = cropped_result
     else:
-        final_image = apply_style_enhancement(cropped_result, cropped_subject)
+        final_image = create_augmented_image(cropped_original, cropped_result, cropped_subject)
 
     overlay = create_overlay(image, saliency, subject_bbox=subject_bbox, crop_box=crop_box)
     summary = create_summary_panel(cropped_original, crop_array(overlay, crop_box), final_image)

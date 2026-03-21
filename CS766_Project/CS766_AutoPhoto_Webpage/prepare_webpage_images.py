@@ -22,7 +22,7 @@ sys.path.insert(0, str(BASE_CODE_DIR))
 
 import config
 from augmentation_utils import (
-    apply_style_enhancement,
+    create_augmented_image,
     compute_crop_box,
     compute_subject_saliency,
     create_overlay,
@@ -119,7 +119,7 @@ def create_auto_assets(image, depth, output_dir, aspect, focus_distance):
 
     crop_box = compute_crop_box(image.shape, subject_mask, subject_bbox, aspect)
     auto_original = crop_array(image, crop_box)
-    auto_augmented = apply_style_enhancement(crop_array(refocused, crop_box), crop_array(subject_mask, crop_box))
+    auto_augmented = create_augmented_image(auto_original, crop_array(refocused, crop_box), crop_array(subject_mask, crop_box))
     auto_subject = create_overlay(image, saliency, subject_bbox=subject_bbox, crop_box=crop_box)
     auto_summary = create_summary_panel(auto_original, crop_array(auto_subject, crop_box), auto_augmented)
 
