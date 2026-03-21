@@ -128,6 +128,13 @@ def save_image(image, path):
         image = (image * 255).astype(np.uint8)
     cv2.imwrite(path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
     print(f"✓ Saved: {path}")
+def save_image(image, path):
+    """Save image (handles float or uint8) with ASCII-only logging."""
+    if image.dtype == np.float32 or image.dtype == np.float64:
+        image = (image * 255).astype(np.uint8)
+    cv2.imwrite(path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+    print(f"Saved: {path}")
+
 # import numpy as np
 # import cv2
 

@@ -3,18 +3,25 @@ import cv2
 import torch
 import sys
 import os
-from PIL import Image
-from transformers import pipeline
 sys.path.append(os.path.join(os.path.dirname(__file__), 'Depth-Anything-V2'))
-from depth_anything_v2.dpt import DepthAnythingV2
 import config
 
 # Global model instance
 _depth_model = None
+_depth_import_error = None
+_fallback_notice_shown = False
+
+try:
+    from depth_anything_v2.dpt import DepthAnythingV2
+except Exception as exc:
+    DepthAnythingV2 = None
+    _depth_import_error = exc
 
 def get_depth_model():
     global _depth_model
     if _depth_model is None:
+        if DepthAnythingV2 is None:
+            raise RuntimeError(f"Depth-Anything import failed: {_depth_import_error}")
         print(f"Loading Depth-Anything V2 model ({config.ENCODER})...")
         print(f"Device: {config.DEVICE}")
         model = DepthAnythingV2(**config.MODEL_CONFIGS[config.ENCODER])
@@ -24,13 +31,56 @@ def get_depth_model():
         model = model.to(config.DEVICE).eval()
         _depth_model = model
         
-        print(f"Model loaded successfully")
+        print("Model loaded successfully")
     
     return _depth_model
 
+
+def estimate_depth_fallback(image_path):
+    """Heuristic pseudo-depth when the learned model is unavailable."""
+    global _fallback_notice_shown
+
+    raw_img = cv2.imread(image_path)
+    if raw_img is None:
+        raise ValueError(f"Failed to load image: {image_path}")
+
+    rgb = cv2.cvtColor(raw_img, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+    gray = cv2.cvtColor(raw_img, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
+    hsv = cv2.cvtColor(raw_img, cv2.COLOR_BGR2HSV).astype(np.float32) / 255.0
+
+    detail = np.abs(gray - cv2.GaussianBlur(gray, (0, 0), 5.0))
+    detail = (detail - detail.min()) / (detail.max() - detail.min() + 1e-8)
+    saturation = hsv[:, :, 1]
+    saturation = (saturation - saturation.min()) / (saturation.max() - saturation.min() + 1e-8)
+
+    height, width = gray.shape
+    yy, xx = np.mgrid[0:height, 0:width].astype(np.float32)
+    xx = xx / max(width - 1, 1)
+    yy = yy / max(height - 1, 1)
+    center = np.exp(-(((xx - 0.5) ** 2) / 0.12 + ((yy - 0.48) ** 2) / 0.20))
+    center = (center - center.min()) / (center.max() - center.min() + 1e-8)
+
+    brightness = rgb.mean(axis=2)
+    brightness = (brightness - brightness.min()) / (brightness.max() - brightness.min() + 1e-8)
+
+    foreground_score = 0.45 * detail + 0.25 * saturation + 0.20 * center + 0.10 * (1.0 - brightness)
+    foreground_score = cv2.GaussianBlur(foreground_score.astype(np.float32), (0, 0), 5.0)
+    foreground_score = (foreground_score - foreground_score.min()) / (foreground_score.max() - foreground_score.min() + 1e-8)
+    pseudo_depth = 1.0 - foreground_score
+
+    if not _fallback_notice_shown:
+        print("Warning: Depth-Anything is unavailable; using pseudo-depth fallback.")
+        print(f"Reason: {_depth_import_error}")
+        _fallback_notice_shown = True
+
+    return pseudo_depth.astype(np.float32)
+	
 def estimate_depth(image_path):
     """Estimate depth using Depth-Anything V2"""
-    model = get_depth_model()
+    try:
+        model = get_depth_model()
+    except Exception:
+        return estimate_depth_fallback(image_path)
     
     # Load image with OpenCV (BGR)
     raw_img = cv2.imread(image_path)

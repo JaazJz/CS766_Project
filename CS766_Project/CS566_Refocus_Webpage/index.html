@@ -3,300 +3,249 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Post-Capture Single Image Refocusing | CS566 Project</title>
+    <title>Automatic Photo Augmentation | CS766 Project</title>
     <style>
+        :root {
+            --bg: #f6f2ea;
+            --paper: #fffdf8;
+            --ink: #1f2933;
+            --muted: #5f6c78;
+            --accent: #c75d2c;
+            --accent-dark: #8f3d1d;
+            --accent-soft: #f1d8cb;
+            --line: #e7ddd1;
+            --shadow: 0 20px 45px rgba(56, 38, 24, 0.12);
+        }
+
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(199, 93, 44, 0.14), transparent 32%),
+                radial-gradient(circle at top right, rgba(61, 123, 121, 0.10), transparent 28%),
+                linear-gradient(180deg, #f7efe4 0%, var(--bg) 35%, #efe7db 100%);
             line-height: 1.6;
-            color: #333;
-            background: #f5f5f5;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background: white;
-            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        .page {
+            max-width: 1220px;
+            margin: 28px auto;
+            background: var(--paper);
+            border: 1px solid rgba(143, 61, 29, 0.08);
+            box-shadow: var(--shadow);
         }
 
-        header {
-            text-align: center;
-            padding: 40px 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        .hero {
+            padding: 60px 52px 36px;
+            background:
+                linear-gradient(135deg, rgba(20, 38, 47, 0.96), rgba(34, 56, 70, 0.90)),
+                linear-gradient(120deg, rgba(199, 93, 44, 0.20), transparent 45%);
             color: white;
-            margin: -20px -20px 40px -20px;
+        }
+
+        .eyebrow {
+            display: inline-block;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-size: 0.78rem;
+            margin-bottom: 18px;
+        }
+
+        h1, h2, h3 {
+            font-family: Georgia, "Times New Roman", serif;
+            font-weight: 600;
         }
 
         h1 {
-            font-size: 2.5em;
-            margin-bottom: 15px;
-            font-weight: 600;
+            font-size: clamp(2.4rem, 4vw, 4rem);
+            line-height: 1.08;
+            max-width: 10ch;
+            margin-bottom: 16px;
         }
 
-        .authors {
-            font-size: 1.2em;
-            margin: 10px 0;
-            font-weight: 300;
+        .hero p {
+            max-width: 74ch;
+            color: rgba(255, 255, 255, 0.84);
+            font-size: 1.02rem;
         }
 
-        .affiliation {
-            font-size: 1em;
-            opacity: 0.9;
-            margin-top: 5px;
+        .hero-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+            margin-top: 28px;
+        }
+
+        .meta-card {
+            padding: 16px 18px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 18px;
+        }
+
+        .meta-card strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        main {
+            padding: 34px 52px 54px;
+        }
+
+        section + section {
+            margin-top: 42px;
         }
 
         h2 {
-            color: #667eea;
-            margin: 40px 0 20px 0;
-            font-size: 2em;
-            border-bottom: 3px solid #667eea;
-            padding-bottom: 10px;
+            font-size: 1.95rem;
+            margin-bottom: 14px;
+            color: var(--accent-dark);
         }
 
         h3 {
-            color: #764ba2;
-            margin: 30px 0 15px 0;
-            font-size: 1.5em;
+            font-size: 1.35rem;
+            margin-bottom: 12px;
+            color: #213744;
         }
 
         p {
-            margin-bottom: 15px;
-            text-align: justify;
+            color: var(--ink);
+            margin-bottom: 14px;
+        }
+
+        .lede {
+            color: var(--muted);
+            max-width: 78ch;
         }
 
         .abstract {
-            background: #f8f9fa;
-            padding: 25px;
-            border-left: 4px solid #667eea;
-            margin: 30px 0;
-            font-size: 1.05em;
-        }
-
-        .method-overview {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin: 30px 0;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 24px;
+            align-items: start;
+            background: linear-gradient(180deg, #fffaf2, #f8f1e8);
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            padding: 26px;
         }
 
-        .method-card {
-            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
-            padding: 25px;
-            border-radius: 10px;
-            border: 2px solid #667eea30;
-            transition: transform 0.3s ease;
-        }
-
-        .method-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
-        }
-
-        .method-card img {
-            width: 100%;
-            height: auto;
-            border-radius: 8px;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
-        }
-
-        .method-number {
-            background: #667eea;
-            color: white;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5em;
-            font-weight: bold;
-            margin-bottom: 15px;
-        }
-
-        /* Image Comparison Slider - FIXED VERSION */
-        .comparison-container {
-            margin: 30px 0;
-            position: relative;
-        }
-
-        .img-comp-container {
-            position: relative;
-            height: 600px;
-            overflow: hidden;
-            border-radius: 10px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
-            background: #000;
-        }
-
-        .img-comp-img {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            top: 0;
-            left: 0;
-        }
-
-        .img-comp-img img {
-            display: block;
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            object-position: center;
-        }
-
-        /* Overlay layer - clips from RIGHT side */
-        .img-comp-img.img-comp-overlay {
-            clip-path: inset(0 0 0 50%);
-        }
-
-        .img-comp-slider {
-            position: absolute;
-            z-index: 9;
-            cursor: ew-resize;
-            width: 50px;
-            height: 50px;
-            background-color: #667eea;
-            border: 3px solid white;
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-        }
-
-        .img-comp-slider::before {
-            content: "⟷";
-            font-size: 24px;
-        }
-
-        /* Vertical divider line */
-        .img-comp-slider::after {
-            content: "";
-            position: absolute;
-            width: 3px;
-            height: 100vh;
-            background-color: white;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 0 10px rgba(0,0,0,0.3);
-            pointer-events: none;
-            z-index: -1;
-        }
-
-        .comparison-labels {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 10px;
-            font-weight: 600;
-            color: #666;
-        }
-
-        /* Gallery Grid */
-        .gallery-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin: 30px 0;
-        }
-
-        .gallery-item {
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease;
-        }
-
-        .gallery-item:hover {
-            transform: scale(1.05);
-        }
-
-        .gallery-item img {
-            width: 100%;
-            height: auto;
-            display: block;
-        }
-
-        .gallery-caption {
-            padding: 15px;
-            text-align: center;
-            font-weight: 600;
-            color: #667eea;
-        }
-
-        /* Code Block */
-        .code-block {
-            background: #2d2d2d;
-            color: #f8f8f2;
-            padding: 20px;
-            border-radius: 10px;
-            overflow-x: auto;
-            margin: 20px 0;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9em;
-        }
-
-        .features-list {
+        .summary-list {
             list-style: none;
-            padding: 0;
+            display: grid;
+            gap: 12px;
         }
 
-        .features-list li {
-            padding: 12px 0 12px 30px;
-            position: relative;
-            font-size: 1.05em;
+        .summary-list li {
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: rgba(199, 93, 44, 0.08);
+            border: 1px solid rgba(199, 93, 44, 0.12);
+            color: var(--ink);
         }
 
-        .features-list li::before {
-            content: "✓";
-            position: absolute;
-            left: 0;
-            color: #667eea;
-            font-weight: bold;
-            font-size: 1.2em;
+        .summary-list strong {
+            color: var(--accent-dark);
         }
 
-        /* Tabs */
+        .full-image {
+            width: 100%;
+            border-radius: 18px;
+            box-shadow: 0 10px 24px rgba(56, 38, 24, 0.16);
+        }
+
+        .pipeline-grid,
+        .card-grid,
+        .info-grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .pipeline-grid {
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        }
+
+        .card-grid {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .info-grid {
+            grid-template-columns: 1.1fr 0.9fr;
+        }
+
+        .card,
+        .panel {
+            background: white;
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            padding: 22px;
+            box-shadow: 0 8px 18px rgba(56, 38, 24, 0.06);
+        }
+
+        .card-number {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 14px;
+            background: var(--accent);
+            color: white;
+            font-weight: 700;
+        }
+
+        .card img,
+        .panel img {
+            width: 100%;
+            display: block;
+            border-radius: 16px;
+            margin-top: 14px;
+        }
+
+        .inline-tag {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent-dark);
+            font-size: 0.84rem;
+            font-weight: 700;
+        }
+
         .tabs {
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #eee;
             flex-wrap: wrap;
+            gap: 12px;
+            margin: 20px 0 22px;
         }
 
         .tab {
-            padding: 12px 25px;
-            background: none;
-            border: none;
+            border: 1px solid var(--line);
+            background: #fff7f2;
+            color: var(--muted);
+            padding: 12px 18px;
+            border-radius: 999px;
             cursor: pointer;
-            font-size: 1.05em;
-            color: #666;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s ease;
+            transition: 0.2s ease;
+            font-size: 0.96rem;
         }
 
-        .tab:hover {
-            color: #667eea;
-        }
-
+        .tab:hover,
         .tab.active {
-            color: #667eea;
-            border-bottom-color: #667eea;
-            font-weight: 600;
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
         }
 
         .tab-content {
@@ -307,595 +256,529 @@
             display: block;
         }
 
-        /* Aperture table */
-        .aperture-table {
+        .comparison-container {
+            margin-top: 16px;
+        }
+
+        .img-comp-container {
+            position: relative;
+            height: 560px;
+            overflow: hidden;
+            border-radius: 22px;
+            background: #111;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+        }
+
+        .img-comp-img {
+            position: absolute;
+            inset: 0;
+        }
+
+        .img-comp-img img {
             width: 100%;
-            border-collapse: collapse;
-            font-size: 0.95em;
-            margin-top: 15px;
+            height: 100%;
+            object-fit: contain;
+            object-position: center;
+            background: #111;
         }
 
-        .aperture-table thead tr {
-            background: #667eea;
-            color: white;
+        .img-comp-overlay {
+            clip-path: inset(0 0 0 50%);
         }
 
-        .aperture-table th,
-        .aperture-table td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
+        .img-comp-slider {
+            position: absolute;
+            z-index: 2;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: 3px solid white;
+            background: var(--accent);
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+            cursor: ew-resize;
         }
 
-        .aperture-table tbody tr:nth-child(odd) {
-            background: #f8f9fa;
+        .img-comp-slider::before,
+        .img-comp-slider::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            width: 12px;
+            height: 12px;
+            border-top: 2px solid white;
+            border-right: 2px solid white;
         }
 
-        .aperture-table tbody tr:nth-child(even) {
+        .img-comp-slider::before {
+            left: 14px;
+            transform: translateY(-50%) rotate(-135deg);
+        }
+
+        .img-comp-slider::after {
+            right: 14px;
+            transform: translateY(-50%) rotate(45deg);
+        }
+
+        .img-comp-slider span {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 3px;
+            height: 180vh;
+            transform: translate(-50%, -50%);
             background: white;
         }
 
-        footer {
-            text-align: center;
-            padding: 30px;
-            margin-top: 50px;
-            background: #f8f9fa;
-            color: #666;
+        .comparison-labels {
+            display: flex;
+            justify-content: space-between;
+            color: var(--muted);
+            font-weight: 700;
+            margin-top: 12px;
         }
 
-        /* Responsive */
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 1.8em;
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 18px;
+            margin-top: 16px;
+        }
+
+        .gallery-item {
+            background: white;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 8px 18px rgba(56, 38, 24, 0.07);
+        }
+
+        .gallery-item img {
+            width: 100%;
+            display: block;
+        }
+
+        .gallery-caption {
+            padding: 14px 16px 16px;
+            color: var(--muted);
+        }
+
+        .gallery-caption strong {
+            color: var(--accent-dark);
+        }
+
+        .feature-list {
+            list-style: none;
+            display: grid;
+            gap: 10px;
+        }
+
+        .feature-list li {
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: #fff7f2;
+            border: 1px solid rgba(199, 93, 44, 0.10);
+        }
+
+        .code-block {
+            background: #202733;
+            color: #f4f1ed;
+            padding: 18px;
+            border-radius: 18px;
+            overflow-x: auto;
+            font-family: "Courier New", monospace;
+            font-size: 0.92rem;
+            white-space: pre-wrap;
+        }
+
+        footer {
+            padding: 28px 52px 42px;
+            color: var(--muted);
+            border-top: 1px solid var(--line);
+        }
+
+        @media (max-width: 900px) {
+            .abstract,
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .page {
+                margin: 0;
+                border: none;
+                box-shadow: none;
             }
 
-            .method-overview {
-                grid-template-columns: 1fr;
+            .hero,
+            main,
+            footer {
+                padding-left: 20px;
+                padding-right: 20px;
             }
 
             .img-comp-container {
-                height: 400px;
+                height: 360px;
             }
 
-            .gallery-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .tab {
-                font-size: 0.9em;
-                padding: 10px 15px;
+            .comparison-labels {
+                font-size: 0.9rem;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Post-Capture Single Image Refocusing</h1>
-            <p class="authors">Jiapeng Zeng, Heyan Zhang, Zichen Liu</p>
-            <p class="affiliation">University of Wisconsin-Madison | CS 566 - Computer Vision</p>
+    <div class="page">
+        <header class="hero">
+            <div class="eyebrow">CS766 Final Project</div>
+            <h1>Automatic Photo Augmentation from a Single Image</h1>
+            <p>
+                We extend a single-image refocusing system into a more automatic post-capture editing pipeline.
+                The CS766 version identifies the main subject, estimates depth, adjusts composition with an adaptive crop,
+                and applies lightweight style enhancement without requiring manual retouching.
+            </p>
+            <div class="hero-meta">
+                <div class="meta-card">
+                    <strong>Team</strong>
+                    Jiapeng Zeng, Heyan Zhang, Lanxi Zhang
+                </div>
+                <div class="meta-card">
+                    <strong>Course</strong>
+                    University of Wisconsin-Madison, CS766
+                </div>
+                <div class="meta-card">
+                    <strong>Project Focus</strong>
+                    Subject emphasis, smart crop, and automatic photo augmentation
+                </div>
+            </div>
         </header>
 
-        <section id="abstract">
-            <h2>Abstract</h2>
-            <div class="abstract">
-                <p>
-                    We present a complete pipeline for post-capture refocusing of single images using deep learning-based 
-                    depth estimation. Our system enables users to change the focus point and depth-of-field characteristics 
-                    of a photograph after it has been taken, simulating different camera settings and creative focus effects. 
-                    The pipeline consists of three key stages: (1) monocular depth estimation using Depth Anything V2, 
-                    (2) all-in-focus image reconstruction with Restormer, and (3) physically-based depth-of-field simulation 
-                    with customizable camera parameters including focal length, aperture, and focus distance.
+        <main>
+            <section>
+                <h2>Overview</h2>
+                <div class="abstract">
+                    <div>
+                        <p>
+                            Many photos fail not because the scene is bad, but because the chosen framing, focus, or style does not match the subject a user actually cares about. Our proposal reframes the task as perceptual post-capture optimization: automatically identify the most important region, emphasize it, and render a more intentional image.
+                        </p>
+                        <p>
+                            The starting point for this project was a CS566 refocusing pipeline. For CS766 we keep the depth-aware refocus core, then add automatic subject discovery, composition adjustment, and style adaptation so the system can produce stronger edits with much less manual input.
+                        </p>
+                    </div>
+                    <ul class="summary-list">
+                        <li><strong>Input:</strong> one RGB photograph</li>
+                        <li><strong>Automatic subject emphasis:</strong> depth, contrast, saturation, and center priors</li>
+                        <li><strong>Composition adjustment:</strong> adaptive crop guided by subject placement</li>
+                        <li><strong>Output:</strong> a refocused and photo-enhanced image with clearer visual hierarchy</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section>
+                <h2>Pipeline</h2>
+                <p class="lede">
+                    The demo pipeline below shows the full CS766 flow from the original photo to the final augmented result.
                 </p>
-            </div>
-        </section>
+                <img class="full-image" src="webpage_images/pipeline-diagram.jpg" alt="CS766 pipeline diagram">
+                <div class="pipeline-grid" style="margin-top: 22px;">
+                    <div class="card">
+                        <div class="card-number">1</div>
+                        <h3>Depth Estimation</h3>
+                        <p>We estimate monocular depth with Depth Anything V2 when the environment supports it, and fall back to a heuristic pseudo-depth prior when local torch and torchvision versions are mismatched.</p>
+                        <span class="inline-tag">Robust demo path</span>
+                    </div>
+                    <div class="card">
+                        <div class="card-number">2</div>
+                        <h3>Automatic Subject Prior</h3>
+                        <p>We combine near-depth preference, local contrast, saturation, edge strength, and a soft center bias to infer which region is most likely to be the intended subject.</p>
+                        <span class="inline-tag">No manual click required</span>
+                    </div>
+                    <div class="card">
+                        <div class="card-number">3</div>
+                        <h3>Adaptive Refocus and Crop</h3>
+                        <p>The subject prior drives automatic focus distance estimation and a crop box that tries to keep the subject comfortably framed while improving balance.</p>
+                        <span class="inline-tag">Composition aware</span>
+                    </div>
+                    <div class="card">
+                        <div class="card-number">4</div>
+                        <h3>Style Enhancement</h3>
+                        <p>We apply lightweight local contrast, color, and detail enhancement, with stronger sharpening concentrated around the automatically selected subject.</p>
+                        <span class="inline-tag">Presentation ready</span>
+                    </div>
+                </div>
+            </section>
 
-        <section id="introduction">
-            <h2>Motivation</h2>
-            <p>
-                Traditional photography requires careful consideration of focus and depth-of-field at the time of capture. 
-                Once a photo is taken, these settings are fixed. Our project addresses this limitation by enabling 
-                post-capture refocusing through computational photography techniques. By combining state-of-the-art 
-                monocular depth estimation with physically-accurate blur simulation, we can retroactively adjust the 
-                focus plane and aperture characteristics of any photograph.
-            </p>
-            <p>
-                This technology has practical applications in photography workflows, allowing photographers to experiment 
-                with different creative choices after shooting, and in mobile photography where physical aperture control 
-                is limited.
-            </p>
-        </section>
+            <section>
+                <h2>Method Details</h2>
+                <div class="card-grid">
+                    <div class="card">
+                        <h3>Depth and Geometry</h3>
+                        <p>Dense depth estimation gives us a rough geometric layout. We smooth and remap the depth field before using it for focus simulation and subject ranking.</p>
+                        <img src="webpage_images/method-depth.jpg" alt="Depth method visualization">
+                    </div>
+                    <div class="card">
+                        <h3>Refocusing Core</h3>
+                        <p>We preserve the original thin-lens style refocus renderer, computing a Circle of Confusion map and blending multiple blur layers to produce depth-aware defocus.</p>
+                        <img src="webpage_images/method-refocus.jpg" alt="Refocus method visualization">
+                    </div>
+                    <div class="card">
+                        <h3>Automatic Augmentation</h3>
+                        <p>The CS766 extension uses the detected subject prior to define a crop and enhance the final image. This step is what turns the system from a manual refocus tool into an automatic photo augmentation pipeline.</p>
+                        <img src="webpage_images/method-augment.jpg" alt="Automatic augmentation summary">
+                    </div>
+                </div>
+            </section>
 
-        <section id="method">
-            <h2>Method Overview</h2>
-            
-            <div style="text-align: center; margin: 40px 0;">
-                <img src="webpage_images/pipeline-diagram.jpg" alt="Pipeline Overview" style="max-width: 100%; height: auto; border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.15);">
-                <p style="color: #666; margin-top: 15px; font-style: italic;">
-                    Complete refocusing pipeline: from single RGB input to customizable depth-of-field output
+            <section>
+                <h2>Interactive Results</h2>
+                <p class="lede">
+                    These examples compare the original image, the inherited refocus outputs, and the new automatic augmentation stage.
                 </p>
-            </div>
+                <div class="tabs">
+                    <button class="tab active" onclick="showTab(event, 'depth-comparison')">Depth</button>
+                    <button class="tab" onclick="showTab(event, 'refocus-comparison')">Refocus</button>
+                    <button class="tab" onclick="showTab(event, 'auto-augment')">Auto Augment</button>
+                    <button class="tab" onclick="showTab(event, 'aperture-comparison')">Aperture</button>
+                    <button class="tab" onclick="showTab(event, 'focus-sweep')">Focus Sweep</button>
+                </div>
 
-            <div class="method-overview">
-                <div class="method-card">
-                    <div class="method-number">1</div>
-                    <h3>Depth Estimation</h3>
-                    <p>
-                        We use <strong>Depth Anything V2</strong>, a Vision Transformer-based monocular depth estimation model, 
-                        to predict dense depth maps from single RGB images. The model employs a ViT-Large backbone pre-trained 
-                        on massive datasets, providing robust zero-shot performance across diverse scenes.
-                    </p>
-                    <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                        <strong>Post-processing Steps:</strong>
-                        <ul style="margin: 10px 0 0 20px; font-size: 0.95em;">
-                            <li>Bilateral filtering for edge-preserving smoothing</li>
-                            <li>Exponential mapping: Z = Z_min × exp(d × log(Z_max/Z_min))</li>
-                            <li>Median filtering to remove noise artifacts</li>
+                <div id="depth-comparison" class="tab-content active">
+                    <h3>Original vs. Depth Prior</h3>
+                    <p>Drag the handle to compare the input photograph against the estimated depth visualization.</p>
+                    <div class="comparison-container">
+                        <div class="img-comp-container">
+                            <div class="img-comp-img">
+                                <img src="webpage_images/original.jpg" alt="Original image">
+                            </div>
+                            <div class="img-comp-img img-comp-overlay">
+                                <img src="webpage_images/depth.jpg" alt="Depth map">
+                            </div>
+                        </div>
+                        <div class="comparison-labels">
+                            <span>Original</span>
+                            <span>Depth prior</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="refocus-comparison" class="tab-content">
+                    <h3>Original vs. Refocused</h3>
+                    <p>This inherited component uses the estimated focus distance and depth map to synthesize a shallower depth of field.</p>
+                    <div class="comparison-container">
+                        <div class="img-comp-container">
+                            <div class="img-comp-img">
+                                <img src="webpage_images/original.jpg" alt="Original image">
+                            </div>
+                            <div class="img-comp-img img-comp-overlay">
+                                <img src="webpage_images/refocused.jpg" alt="Refocused image">
+                            </div>
+                        </div>
+                        <div class="comparison-labels">
+                            <span>Original</span>
+                            <span>Refocused</span>
+                        </div>
+                    </div>
+                    <div class="panel" style="margin-top: 18px;">
+                        <h3>CoC Visualization</h3>
+                        <p>The Circle of Confusion map highlights where the renderer assigns stronger blur.</p>
+                        <img src="webpage_images/coc.jpg" alt="CoC map">
+                    </div>
+                </div>
+
+                <div id="auto-augment" class="tab-content">
+                    <h3>Automatic Augmentation Result</h3>
+                    <p>The left image is the adaptive crop before enhancement. The right image is the final augmented result.</p>
+                    <div class="info-grid">
+                        <div>
+                            <div class="comparison-container">
+                                <div class="img-comp-container">
+                                    <div class="img-comp-img">
+                                        <img src="webpage_images/auto_original.jpg" alt="Adaptive crop original">
+                                    </div>
+                                    <div class="img-comp-img img-comp-overlay">
+                                        <img src="webpage_images/auto_augmented.jpg" alt="Automatic augmentation output">
+                                    </div>
+                                </div>
+                                <div class="comparison-labels">
+                                    <span>Adaptive crop</span>
+                                    <span>Final augment</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="panel">
+                            <h3>Subject Prior and Crop</h3>
+                            <p>The overlay shows the saliency prior, the detected subject box, and the crop selected for final enhancement.</p>
+                            <img src="webpage_images/auto_subject.jpg" alt="Automatic subject overlay">
+                        </div>
+                    </div>
+                    <div class="panel" style="margin-top: 18px;">
+                        <h3>Summary Strip</h3>
+                        <img src="webpage_images/auto_summary.jpg" alt="Automatic augmentation summary strip">
+                    </div>
+                </div>
+
+                <div id="aperture-comparison" class="tab-content">
+                    <h3>Depth-of-Field Sweep Across Apertures</h3>
+                    <p>These samples show how the inherited refocus module behaves when the aperture changes.</p>
+                    <div class="gallery-grid">
+                        <div class="gallery-item">
+                            <img src="webpage_images/f1.0.jpg" alt="f1.0">
+                            <div class="gallery-caption"><strong>f/1.0</strong><br>Extreme background blur</div>
+                        </div>
+                        <div class="gallery-item">
+                            <img src="webpage_images/f1.4.jpg" alt="f1.4">
+                            <div class="gallery-caption"><strong>f/1.4</strong><br>Very shallow depth of field</div>
+                        </div>
+                        <div class="gallery-item">
+                            <img src="webpage_images/f2.8.jpg" alt="f2.8">
+                            <div class="gallery-caption"><strong>f/2.8</strong><br>Strong portrait-style emphasis</div>
+                        </div>
+                        <div class="gallery-item">
+                            <img src="webpage_images/f5.6.jpg" alt="f5.6">
+                            <div class="gallery-caption"><strong>f/5.6</strong><br>Moderate blur</div>
+                        </div>
+                        <div class="gallery-item">
+                            <img src="webpage_images/f8.0.jpg" alt="f8.0">
+                            <div class="gallery-caption"><strong>f/8.0</strong><br>Deeper focus</div>
+                        </div>
+                        <div class="gallery-item">
+                            <img src="webpage_images/f11.0.jpg" alt="f11.0">
+                            <div class="gallery-caption"><strong>f/11.0</strong><br>Minimal synthetic blur</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="focus-sweep" class="tab-content">
+                    <h3>Automatic Focus Sweep</h3>
+                    <p>This animation helps visualize how the focus plane moves through the scene as depth changes.</p>
+                    <div class="panel">
+                        <img src="webpage_images/focus-sweep.gif" alt="Focus sweep animation">
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Implementation</h2>
+                <div class="card-grid">
+                    <div class="panel">
+                        <h3>Core Components</h3>
+                        <ul class="feature-list">
+                            <li>Depth Anything V2 or pseudo-depth fallback for robust demo execution</li>
+                            <li>Depth-aware Circle of Confusion renderer from the original refocus project</li>
+                            <li>Automatic subject saliency from depth, contrast, saturation, and center priors</li>
+                            <li>Adaptive crop and subject-aware enhancement for final photo augmentation</li>
                         </ul>
                     </div>
-                    <div style="text-align: center; margin-top: 20px;">
-                        <img src="webpage_images/depth.jpg" alt="Depth Estimation Process" style="max-width: 100%; border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,0.2);">
-                        <p style="color: #666; font-size: 0.9em; margin-top: 8px;">RGB image → Dense depth prediction → Refined depth map</p>
+                    <div class="panel">
+                        <h3>Command Examples</h3>
+                        <div class="code-block">python CS766_Project/Refocus_BaseCode/auto_augment.py Image_Folder/pic-20.jpg --output-dir Auto_Augment_Results
+
+python CS766_Project/CS566_Refocus_Webpage/prepare_webpage_images.py Image_Folder/pic-20.jpg --output-dir CS766_Project/CS566_Refocus_Webpage/webpage_images
+
+python CS766_Project/CS566_Refocus_Webpage/update_html_paths.py webpage_images</div>
                     </div>
                 </div>
+            </section>
 
-                <div class="method-card">
-                    <div class="method-number">2</div>
-                    <h3>All-in-Focus Reconstruction</h3>
-                    <p>
-                        Using <strong>Restormer</strong>, a Transformer-based image restoration model, we generate an 
-                        all-in-focus version of the input image by removing existing defocus blur. The model uses multi-head 
-                        transposed attention and gated feed-forward networks for efficient high-resolution restoration.
-                    </p>
-                    <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                        <strong>Key Features:</strong>
-                        <ul style="margin: 10px 0 0 20px; font-size: 0.95em;">
-                            <li>Handles spatially-varying defocus blur</li>
-                            <li>Preserves fine details and textures</li>
-                            <li>Works on single images without dual-pixel data</li>
+            <section>
+                <h2>Challenges and Next Steps</h2>
+                <div class="card-grid">
+                    <div class="panel">
+                        <h3>Current Challenges</h3>
+                        <ul class="feature-list">
+                            <li>Monocular depth still introduces edge errors around thin structures and cluttered scenes.</li>
+                            <li>The subject heuristic is effective for demos, but it is not yet learned end-to-end from user preference data.</li>
+                            <li>Automatic cropping can fail on unusual compositions where the intended subject is not the most salient region.</li>
                         </ul>
                     </div>
-                    <div style="text-align: center; margin-top: 20px;">
-                        <img src="webpage_images/method-deblur.jpg" alt="Deblurring Process" style="max-width: 100%; border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,0.2);">
-                        <p style="color: #666; font-size: 0.9em; margin-top: 8px;">Defocused input → Restormer → Sharp all-in-focus image</p>
-                    </div>
-                </div>
-
-                <div class="method-card">
-                    <div class="method-number">3</div>
-                    <h3>Depth-of-Field Simulation</h3>
-                    <p>
-                        We simulate realistic depth-of-field by computing the <strong>Circle of Confusion (CoC)</strong> 
-                        for each pixel based on its depth, selected focus distance, and camera parameters. The thin lens 
-                        equation determines blur radius:
-                    </p>
-                    <div style="margin-top: 15px; padding: 15px; background: #2d2d2d; color: #f8f8f2; border-radius: 8px; font-family: monospace; font-size: 0.9em;">
-                        CoC = (A × |s - z| × f) / (z × (s - f))
-                        <br><br>
-                        where:<br>
-                        &nbsp;&nbsp;A = focal_length / f_number (aperture diameter)<br>
-                        &nbsp;&nbsp;s = focus distance<br>
-                        &nbsp;&nbsp;z = depth at pixel<br>
-                        &nbsp;&nbsp;f = focal length
-                    </div>
-                    <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                        <strong>Rendering Process:</strong>
-                        <ul style="margin: 10px 0 0 20px; font-size: 0.95em;">
-                            <li>Generate 20+ blur layers with varying Gaussian kernel sizes</li>
-                            <li>Map each pixel to appropriate blur layer based on CoC</li>
-                            <li>Blend layers with linear interpolation for smooth transitions</li>
+                    <div class="panel">
+                        <h3>Future Work</h3>
+                        <ul class="feature-list">
+                            <li>Train a learned importance predictor for subject emphasis rather than using heuristics alone.</li>
+                            <li>Add multiple target aspect ratios and platform-specific crop presets.</li>
+                            <li>Introduce stronger style controls so users can choose portrait, editorial, or cinematic output modes.</li>
+                            <li>Connect the pipeline to a simple web upload interface for live demos.</li>
                         </ul>
                     </div>
-                    <div style="text-align: center; margin-top: 20px;">
-                        <img src="webpage_images/method-refocus.jpg" alt="Refocusing Process" style="max-width: 100%; border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,0.2);">
-                        <p style="color: #666; font-size: 0.9em; margin-top: 8px;">Depth + Focus → CoC Map → Blur Layers → Final refocused image</p>
-                    </div>
                 </div>
-            </div>
-        </section>
-
-        <section id="results">
-            <h2>Interactive Results</h2>
-            
-            <div class="tabs">
-                <button class="tab active" onclick="showTab('depth-comparison')">Depth Estimation</button>
-                <button class="tab" onclick="showTab('refocus-comparison')">Refocusing Effects</button>
-                <button class="tab" onclick="showTab('coc-visualization')">CoC Visualization</button>
-                <button class="tab" onclick="showTab('aperture-comparison')">Aperture Comparison</button>
-                <button class="tab" onclick="showTab('focus-sweep')">Focus Sweep</button>
-            </div>
-
-            <!-- Depth Comparison: LEFT=Original, RIGHT=Depth -->
-            <div id="depth-comparison" class="tab-content active">
-                <h3>Depth Map Visualization</h3>
-                <p>Drag the slider to compare. Left side shows the original image, right side shows the predicted depth map.</p>
-                
-                <div class="comparison-container">
-                    <div class="img-comp-container" id="depthComparison">
-                        <!-- Base layer: ORIGINAL (always visible on LEFT) -->
-                        <div class="img-comp-img">
-                            <img src="webpage_images/original.jpg" alt="Original Image">
-                        </div>
-                        <!-- Overlay layer: DEPTH (reveals from RIGHT) -->
-                        <div class="img-comp-img img-comp-overlay">
-                            <img src="webpage_images/depth.jpg" alt="Depth Map">
-                        </div>
-                    </div>
-                    <div class="comparison-labels">
-                        <span>← Original Image</span>
-                        <span>Depth Map (Depth Anything V2) →</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Refocus Comparison: LEFT=Original, RIGHT=Refocused -->
-            <div id="refocus-comparison" class="tab-content">
-                <h3>Before and After Refocusing</h3>
-                <p>Drag the slider to compare. Left side shows the original, right side shows the refocused result.</p>
-                
-                <div class="comparison-container">
-                    <div class="img-comp-container" id="refocusComparison">
-                        <!-- Base: ORIGINAL (LEFT) -->
-                        <div class="img-comp-img">
-                            <img src="webpage_images/original.jpg" alt="Original">
-                        </div>
-                        <!-- Overlay: REFOCUSED (RIGHT) -->
-                        <div class="img-comp-img img-comp-overlay">
-                            <img src="webpage_images/refocused.jpg" alt="Refocused">
-                        </div>
-                    </div>
-                    <div class="comparison-labels">
-                        <span>← Original Image</span>
-                        <span>Refocused (f/2.8) →</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- CoC Visualization: LEFT=Original, RIGHT=CoC -->
-            <div id="coc-visualization" class="tab-content">
-                <h3>Circle of Confusion (CoC) Map</h3>
-                <p>The CoC map shows blur intensity. Brighter = more blur.</p>
-                
-                <div class="comparison-container">
-                    <div class="img-comp-container" id="cocComparison">
-                        <!-- Base: REFOCUSED (LEFT) -->
-                        <div class="img-comp-img">
-                            <img src="webpage_images/refocused.jpg" alt="Refocused">
-                        </div>
-                        <!-- Overlay: COC (RIGHT) -->
-                        <div class="img-comp-img img-comp-overlay">
-                            <img src="webpage_images/coc.jpg" alt="CoC Map">
-                        </div>
-                    </div>
-                    <div class="comparison-labels">
-                        <span>← Refocused Result</span>
-                        <span>CoC Map →</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Aperture Comparison -->
-            <div id="aperture-comparison" class="tab-content">
-                <h3>Aperture Effects (f/1.0 to f/11.0)</h3>
-                <p>Different apertures create varying bokeh effects. Smaller f-numbers = more blur.</p>
-                
-                <div class="gallery-grid">
-                    <div class="gallery-item">
-                        <img src="webpage_images/f1.0.jpg" alt="f/1.0">
-                        <div class="gallery-caption">
-                            <strong>f/1.0</strong><br>
-                            <span style="font-size: 0.85em; color: #666;">Extreme bokeh</span>
-                        </div>
-                    </div>
-                    <div class="gallery-item">
-                        <img src="webpage_images/f1.4.jpg" alt="f/1.4">
-                        <div class="gallery-caption">
-                            <strong>f/1.4</strong><br>
-                            <span style="font-size: 0.85em; color: #666;">Very shallow DoF</span>
-                        </div>
-                    </div>
-                    <div class="gallery-item">
-                        <img src="webpage_images/f2.8.jpg" alt="f/2.8">
-                        <div class="gallery-caption">
-                            <strong>f/2.8</strong><br>
-                            <span style="font-size: 0.85em; color: #666;">Portrait standard</span>
-                        </div>
-                    </div>
-                    <div class="gallery-item">
-                        <img src="webpage_images/f5.6.jpg" alt="f/5.6">
-                        <div class="gallery-caption">
-                            <strong>f/5.6</strong><br>
-                            <span style="font-size: 0.85em; color: #666;">Moderate DoF</span>
-                        </div>
-                    </div>
-                    <div class="gallery-item">
-                        <img src="webpage_images/f8.0.jpg" alt="f/8.0">
-                        <div class="gallery-caption">
-                            <strong>f/8.0</strong><br>
-                            <span style="font-size: 0.85em; color: #666;">Deep DoF</span>
-                        </div>
-                    </div>
-                    <div class="gallery-item">
-                        <img src="webpage_images/f11.0.jpg" alt="f/11.0">
-                        <div class="gallery-caption">
-                            <strong>f/11.0</strong><br>
-                            <span style="font-size: 0.85em; color: #666;">Maximum sharpness</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 10px;">
-                    <h4 style="margin-bottom: 15px; color: #667eea;">📊 Aperture Reference</h4>
-                    <table class="aperture-table">
-                        <thead>
-                            <tr>
-                                <th>f-number</th>
-                                <th>Size</th>
-                                <th>Blur</th>
-                                <th>Use Case</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>f/1.0</strong></td>
-                                <td>Extra Large</td>
-                                <td>Extreme</td>
-                                <td>Cinematic portraits</td>
-                            </tr>
-                            <tr>
-                                <td><strong>f/1.4</strong></td>
-                                <td>Very Large</td>
-                                <td>Maximum</td>
-                                <td>Low light, bokeh</td>
-                            </tr>
-                            <tr>
-                                <td><strong>f/2.8</strong></td>
-                                <td>Large</td>
-                                <td>Strong</td>
-                                <td>Professional portraits</td>
-                            </tr>
-                            <tr>
-                                <td><strong>f/5.6</strong></td>
-                                <td>Medium</td>
-                                <td>Moderate</td>
-                                <td>Group photos</td>
-                            </tr>
-                            <tr>
-                                <td><strong>f/8.0</strong></td>
-                                <td>Small</td>
-                                <td>Minimal</td>
-                                <td>Landscapes</td>
-                            </tr>
-                            <tr>
-                                <td><strong>f/11.0</strong></td>
-                                <td>Very Small</td>
-                                <td>Near Zero</td>
-                                <td>Maximum DoF</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Focus Sweep -->
-            <div id="focus-sweep" class="tab-content">
-                <h3>Focus Sweep Animation</h3>
-                <p>Watch the focus plane transition smoothly from near to far objects.</p>
-                
-                <div style="text-align: center; margin: 30px 0;">
-                    <img src="webpage_images/focus-sweep.gif" alt="Focus Sweep" style="max-width: 100%; height: auto; border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.2);">
-                </div>
-            </div>
-        </section>
-
-        <section id="features">
-            <h2>Key Features</h2>
-            <ul class="features-list">
-                <li>Interactive focus point selection via mouse click</li>
-                <li>Customizable camera parameters (focal length, aperture, sensor size)</li>
-                <li>Multiple rendering modes: basic, comparison, aperture sweep, focus animation</li>
-                <li>Physically-accurate Circle of Confusion (CoC) computation</li>
-            </ul>
-        </section>
-
-        <section id="implementation">
-            <h2>Implementation Details</h2>
-            
-            <h3>Technical Stack</h3>
-            <ul class="features-list">
-                <li>Python 3.8+ with PyTorch</li>
-                <li>Depth Anything V2 (ViT-Large backbone)</li>
-                <li>OpenCV for image processing and interactive GUI</li>
-                <li>NumPy for numerical computations</li>
-            </ul>
-
-            <h3>Circle of Confusion Formula</h3>
-            <p>The blur radius for each pixel is computed using the thin lens equation:</p>
-            <div class="code-block">
-CoC = (A × |s - z| × f) / (z × (s - f))
-
-where:
-  A = aperture diameter (focal_length / f_number)
-  s = focus distance
-  z = depth at pixel
-  f = focal length
-            </div>
-
-            <h3>Usage Example</h3>
-            <div class="code-block">
-# Basic refocusing with interactive focus selection
-python main.py input.jpg --output result.png
-
-# Portrait mode with specific settings
-python main.py input.jpg --preset portrait --focus 2.5
-
-# Generate aperture comparison grid
-python main.py input.jpg --mode aperture
-
-# Create focus sweep animation
-python main.py input.jpg --mode sweep
-            </div>
-
-            <h3>Batch Processing</h3>
-            <p>For processing multiple images with saved focus settings:</p>
-            <div class="code-block">
-# Process all images in Image_Folder/
-python batch_process.py
-
-# Results saved to Batch_Results/ with:
-# - *_comparison.png (before/after/depth)
-# - *_apertures.png (2×3 grid of different apertures)
-            </div>
-        </section>
-
-        <section id="challenges">
-            <h2>Challenges & Solutions</h2>
-            
-            <h3>Depth Map Quality</h3>
-            <p>
-                Raw depth predictions sometimes contained noise and inaccurate edges. We addressed this through:
-            </p>
-            <ul class="features-list">
-                <li>Bilateral filtering to smooth depth while preserving edges</li>
-                <li>Median filtering to remove salt-and-pepper noise</li>
-                <li>Exponential depth mapping for more realistic distance distribution</li>
-            </ul>
-
-            <h3>All-in-Focus Reconstruction</h3>
-            <p>
-                Recovering sharp details from heavily blurred regions proved challenging. While Restormer improved 
-                local contrast, complete detail recovery from extreme defocus remains an open problem. Our system 
-                works best with moderately blurred inputs.
-            </p>
-
-            <h3>Performance Optimization</h3>
-            <p>
-                High-resolution processing was memory-intensive. We implemented:
-            </p>
-            <ul class="features-list">
-                <li>GPU acceleration (CUDA/MPS) for depth inference</li>
-                <li>Layer-based rendering with efficient blur computation</li>
-                <li>Batch processing pipeline for multiple images</li>
-            </ul>
-            
-        </section>
-
-        <section id="future">
-            <h2>Future Work</h2>
-            <h3>Depth Discontinuity and Edge Accuracy</h3>
-            <p>
-                Due to limitations in monocular depth estimation, the predicted depth maps often lack precise structure around 
-                object boundaries. As a result, when simulating large-aperture effects, edges between foreground and background 
-                objects appear unnaturally sharp or halo-like, revealing the depth estimation artifacts. Traditional noise-based 
-                or aperture-scaling blur methods fail to handle these discontinuities correctly, leading to visible outlines 
-                around objects.
-            </p>
-            <p><strong>Potential Solutions:</strong></p>
-            <ul class="features-list">
-                <li>Incorporate <strong>edge-aware or boundary-consistent loss functions</strong> during depth model training to better preserve depth discontinuities.</li>
-                <li>Apply <strong>joint edge–depth refinement</strong> post-processing (e.g., guided filtering using image gradients) to align depth transitions with real edges.</li>
-                <li>Explore <strong>multi-task learning frameworks</strong> that combine depth estimation with semantic segmentation or edge detection supervision for enhanced geometric consistency.</li>
-                <li>Implement <strong>adaptive blur blending</strong> strategies that reduce halo artifacts in regions with high depth variance.</li>
-            </ul>
-            <h3>Other Possible Works </h3>
-            <ul class="features-list">
-                <li>Fine-tune Restormer on DPDD dataset for better deblurring</li>
-                <li>Implement custom aperture shapes (hexagonal, octagonal bokeh)</li>
-                <li>Add real-time preview for interactive refocusing</li>
-                <li>Quantitative evaluation on benchmark datasets (NYU Depth V2)</li>
-                <li>Edge-aware compositing to reduce halo artifacts</li>
-                <li>Support for video refocusing with temporal consistency</li>
-            </ul>
-        </section>
-
-        <section id="references">
-            <h2>References</h2>
-            <p><strong>[1]</strong> Yang, L., et al. (2024). "Depth Anything V2." <em>arXiv preprint arXiv:2406.09414</em></p>
-            <p><strong>[2]</strong> Zamir, S. W., et al. (2022). "Restormer: Efficient Transformer for High-Resolution Image Restoration." <em>CVPR 2022</em></p>
-            <p><strong>[3]</strong> Abuolaim, A., & Brown, M. S. (2020). "Defocus Deblurring Using Dual-Pixel Data." <em>ECCV 2020</em></p>
-        </section>
-
-        <section id="code">
-            <h2>Code & Resources</h2>
-            <p>
-                <strong>GitHub Repository:</strong> <a href="#" style="color: #667eea;">github.com/your-repo/refocusing-project</a>
-            </p>
-            <p>
-                <strong>Demo Video:</strong> <a href="#" style="color: #667eea;">youtube.com/your-demo</a>
-            </p>
-        </section>
+            </section>
+        </main>
 
         <footer>
-            <p>CS 566 Computer Vision Project | University of Wisconsin-Madison | Fall 2025</p>
-            <p>Jiapeng Zeng, Heyan Zhang, Zichen Liu</p>
+            <p>CS766 Project Demo | University of Wisconsin-Madison</p>
+            <p>Automatic photo augmentation built on top of a single-image refocusing pipeline.</p>
         </footer>
     </div>
 
     <script>
         function initComparisons() {
-            const containers = document.querySelectorAll('.img-comp-container');
-            
-            containers.forEach(container => {
-                // Remove existing slider
-                const existingSlider = container.querySelector('.img-comp-slider');
-                if (existingSlider) existingSlider.remove();
-                
-                const overlay = container.querySelector('.img-comp-overlay');
-                if (!overlay) return;
-                
-                const slider = document.createElement('div');
-                slider.className = 'img-comp-slider';
-                container.appendChild(slider);
-                
-                // Initial position (50% = middle)
-                overlay.style.clipPath = 'inset(0 0 0 50%)';
-                slider.style.left = '50%';
-                
-                let clicked = false;
-                
-                function slideMove(e) {
-                    if (!clicked) return;
-                    e.preventDefault();
-                    
-                    const rect = container.getBoundingClientRect();
-                    let x = e.pageX || (e.touches && e.touches[0].pageX);
-                    let pos = ((x - rect.left) / rect.width) * 100;
-                    pos = Math.max(0, Math.min(100, pos));
-                    
-                    // Update clip-path: clips from LEFT side
-                    overlay.style.clipPath = `inset(0 0 0 ${pos}%)`;
-                    slider.style.left = pos + '%';
+            const containers = document.querySelectorAll(".img-comp-container");
+            containers.forEach((container) => {
+                const existing = container.querySelector(".img-comp-slider");
+                if (existing) {
+                    existing.remove();
                 }
-                
-                slider.addEventListener('mousedown', () => clicked = true);
-                slider.addEventListener('touchstart', (e) => {
-                    clicked = true;
-                    e.preventDefault();
+
+                const overlay = container.querySelector(".img-comp-overlay");
+                if (!overlay) {
+                    return;
+                }
+
+                overlay.style.clipPath = "inset(0 0 0 50%)";
+                const slider = document.createElement("div");
+                slider.className = "img-comp-slider";
+                const divider = document.createElement("span");
+                slider.appendChild(divider);
+                container.appendChild(slider);
+                slider.style.left = "50%";
+
+                let active = false;
+
+                function moveSlider(event) {
+                    if (!active) {
+                        return;
+                    }
+                    event.preventDefault();
+                    const rect = container.getBoundingClientRect();
+                    const pageX = event.touches ? event.touches[0].clientX : event.clientX;
+                    let percent = ((pageX - rect.left) / rect.width) * 100;
+                    percent = Math.max(0, Math.min(100, percent));
+                    overlay.style.clipPath = `inset(0 0 0 ${percent}%)`;
+                    slider.style.left = `${percent}%`;
+                }
+
+                slider.addEventListener("mousedown", () => {
+                    active = true;
                 });
-                
-                document.addEventListener('mouseup', () => clicked = false);
-                document.addEventListener('touchend', () => clicked = false);
-                
-                container.addEventListener('mousemove', slideMove);
-                container.addEventListener('touchmove', slideMove, { passive: false });
+                slider.addEventListener("touchstart", (event) => {
+                    active = true;
+                    event.preventDefault();
+                });
+
+                document.addEventListener("mouseup", () => {
+                    active = false;
+                });
+                document.addEventListener("touchend", () => {
+                    active = false;
+                });
+
+                container.addEventListener("mousemove", moveSlider);
+                container.addEventListener("touchmove", moveSlider, { passive: false });
             });
         }
-        
-        function showTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            
-            document.getElementById(tabId).classList.add('active');
-            event.target.classList.add('active');
-            
-            setTimeout(() => initComparisons(), 100);
+
+        function showTab(event, tabId) {
+            document.querySelectorAll(".tab-content").forEach((tab) => tab.classList.remove("active"));
+            document.querySelectorAll(".tab").forEach((button) => button.classList.remove("active"));
+            document.getElementById(tabId).classList.add("active");
+            event.currentTarget.classList.add("active");
+            setTimeout(initComparisons, 80);
         }
-        
-        window.addEventListener('load', () => initComparisons());
+
+        window.addEventListener("load", initComparisons);
     </script>
 </body>
 </html>

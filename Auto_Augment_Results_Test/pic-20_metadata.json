@@ -1,0 +1,24 @@
+{
+  "image": "Image_Folder\\pic-20.jpg",
+  "focus_distance_m": 2.3872,
+  "aspect_ratio": "4:5",
+  "skip_refocus": false,
+  "skip_enhance": false,
+  "subject_bbox_xywh": [
+    435,
+    394,
+    1092,
+    1264
+  ],
+  "crop_box_xywh": [
+    434,
+    0,
+    1614,
+    2017
+  ],
+  "outputs": {
+    "final": "Auto_Augment_Results_Test\\pic-20_auto_augmented.png",
+    "overlay": "Auto_Augment_Results_Test\\pic-20_subject_overlay.png",
+    "summary": "Auto_Augment_Results_Test\\pic-20_summary.png"
+  }
+}
