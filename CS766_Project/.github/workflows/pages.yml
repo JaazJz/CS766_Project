@@ -1,4 +1,4 @@
-name: Deploy subfolder to GitHub Pages
+name: Deploy Site To GitHub Pages
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
       - name: Upload static site artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: CS566_Refocus_Webpage  # 这里是你的网页所在文件夹
+          path: CS766_AutoPhoto_Webpage
 
   deploy:
     needs: build

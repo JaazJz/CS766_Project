@@ -1,22 +1,21 @@
-1. For the CS766 webpage demo, see `CS566_Refocus_Webpage/index.html`.
+# CS766 Project
 
-   Run and update the webpage assets:
+Automatic photo augmentation from a single image.
 
-   ```bash
-   python3.12 prepare_webpage_images.py Test_IMG.jpg -o webpage_images
-   python update_html_paths.py webpage_images
-   ```
+## Main components
 
-2. For the inherited manual single-image refocus baseline, use the base code:
+- `CS766_AutoPhoto_Core/`: depth estimation, subject prioritization, smart crop, and enhancement pipeline
+- `CS766_AutoPhoto_Webpage/`: static demo site and asset generation scripts
 
-   ```bash
-   python CS766_Project/Refocus_BaseCode/main.py CS766_Project/Refocus_BaseCode/Test_IMG.jpg --mode comparison
-   ```
+## Run the pipeline
 
-3. For the CS766 extension, use the automatic photo augmentation pipeline:
+```bash
+python CS766_Project/CS766_AutoPhoto_Core/auto_augment.py Image_Folder --aspect 4:5 --output-dir Auto_Augment_Results
+```
 
-   ```bash
-   python CS766_Project/Refocus_BaseCode/auto_augment.py Image_Folder --aspect 4:5 --output-dir Auto_Augment_Results
-   ```
+## Refresh the webpage demo
 
-   This adds automatic subject emphasis, adaptive crop, and lightweight style enhancement on top of the original refocus project.
+```bash
+python CS766_Project/CS766_AutoPhoto_Webpage/prepare_webpage_images.py Image_Folder/pic-24.jpg --output-dir CS766_Project/CS766_AutoPhoto_Webpage/webpage_images
+python CS766_Project/CS766_AutoPhoto_Webpage/update_html_paths.py webpage_images
+```
