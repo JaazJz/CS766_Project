@@ -183,6 +183,23 @@ def crop_array(values, crop_box):
     return values[y:y + h, x:x + w, ...]
 
 
+def _unsharp_mask(image, sigma=1.2, amount=0.45):
+    base = cv2.GaussianBlur(image, (0, 0), sigma)
+    return np.clip(image + amount * (image - base), 0.0, 1.0)
+
+
+def preserve_subject_focus(original, refocused, subject_mask):
+    """Keep the chosen subject crisp while allowing the background to stay defocused."""
+    mask = normalize_map(subject_mask)
+    mask = np.clip((mask - 0.12) / 0.50, 0.0, 1.0)
+    mask = cv2.GaussianBlur(mask.astype(np.float32), (0, 0), 9.0)
+    mask = mask[:, :, np.newaxis]
+
+    crisp_subject = _unsharp_mask(original, sigma=1.0, amount=0.35)
+    protected = refocused * (1.0 - mask) + crisp_subject * mask
+    return np.clip(protected, 0.0, 1.0)
+
+
 def apply_style_enhancement(image, subject_mask=None):
     """Lightweight subject-aware tone, color, and detail enhancement."""
     rgb8 = np.clip(image * 255.0, 0, 255).astype(np.uint8)
@@ -198,8 +215,7 @@ def apply_style_enhancement(image, subject_mask=None):
     hsv[:, :, 1] = np.clip(hsv[:, :, 1] * 1.08 + 3.0, 0, 255)
     enhanced = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2RGB).astype(np.float32) / 255.0
 
-    base = cv2.GaussianBlur(enhanced, (0, 0), 1.2)
-    sharpened = np.clip(enhanced + 0.45 * (enhanced - base), 0.0, 1.0)
+    sharpened = _unsharp_mask(enhanced, sigma=1.2, amount=0.45)
 
     if subject_mask is None:
         return sharpened

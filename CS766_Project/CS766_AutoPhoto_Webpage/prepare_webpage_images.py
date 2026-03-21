@@ -30,6 +30,7 @@ from augmentation_utils import (
     crop_array,
     estimate_focus_distance,
     extract_subject_mask,
+    preserve_subject_focus,
 )
 from depth_utils import compute_coc, process_depth, select_focus_interactive
 from renderer import render_dof, save_image
@@ -113,7 +114,8 @@ def create_auto_assets(image, depth, output_dir, aspect, focus_distance):
         print(f"Automatic focus distance: {focus_distance:.2f}m")
 
     coc = compute_coc(depth, config.FOCAL_LENGTH, config.F_NUMBER, focus_distance, config.SENSOR_WIDTH, image.shape[1], config.MAX_BLUR_PX)
-    refocused = render_dof(image, coc, config.NUM_LAYERS, config.MAX_BLUR_PX)
+    refocused_raw = render_dof(image, coc, config.NUM_LAYERS, config.MAX_BLUR_PX)
+    refocused = preserve_subject_focus(image, refocused_raw, subject_mask)
 
     crop_box = compute_crop_box(image.shape, subject_mask, subject_bbox, aspect)
     auto_original = crop_array(image, crop_box)

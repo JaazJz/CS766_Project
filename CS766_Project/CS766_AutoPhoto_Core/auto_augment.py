@@ -20,6 +20,7 @@ from augmentation_utils import (
     estimate_focus_distance,
     extract_subject_mask,
     metadata_to_json,
+    preserve_subject_focus,
 )
 from depth_utils import compute_coc, process_depth
 from renderer import render_dof, save_image
@@ -70,7 +71,8 @@ def run_auto_augment(image_path, output_dir, aspect, skip_refocus, skip_enhance)
             width,
             config.MAX_BLUR_PX,
         )
-        emphasized = render_dof(image, coc, config.NUM_LAYERS, config.MAX_BLUR_PX)
+        refocused = render_dof(image, coc, config.NUM_LAYERS, config.MAX_BLUR_PX)
+        emphasized = preserve_subject_focus(image, refocused, subject_mask)
 
     crop_box = compute_crop_box(image.shape, subject_mask, subject_bbox, aspect)
     cropped_result = crop_array(emphasized, crop_box)
