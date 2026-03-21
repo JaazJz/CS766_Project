@@ -88,20 +88,35 @@ def build_pipeline_diagram(images, labels, output_path):
     print(f"Saved: {output_path}")
 
 
-def create_focus_sweep_gif(image, depth, output_path, num_frames=10):
+def _make_labeled_panel(image, title, subtitle=None):
+    panel = np.clip(image * 255.0, 0, 255).astype(np.uint8)
+    cv2.rectangle(panel, (0, 0), (panel.shape[1], 64), (0, 0, 0), -1)
+    cv2.putText(panel, title, (18, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.85, (255, 255, 255), 2)
+    if subtitle:
+        cv2.putText(panel, subtitle, (18, 54), cv2.FONT_HERSHEY_SIMPLEX, 0.62, (220, 220, 220), 1)
+    return panel.astype(np.float32) / 255.0
+
+
+def create_focus_sweep_gif(image, depth, subject_mask, output_path, num_frames=8):
     frames = []
     width = image.shape[1]
-    focus_distances = np.linspace(depth.min(), depth.max(), num_frames)
+    near = float(np.percentile(depth, 12))
+    far = float(np.percentile(depth, 88))
+    focus_distances = np.linspace(near, far, num_frames)
+    sweep_aperture = min(config.F_NUMBER, 1.4)
 
     for idx, focus_distance in enumerate(focus_distances, start=1):
         print(f"Generating focus sweep frame {idx}/{num_frames} at {focus_distance:.2f}m")
-        coc = compute_coc(depth, config.FOCAL_LENGTH, config.F_NUMBER, focus_distance, config.SENSOR_WIDTH, width, config.MAX_BLUR_PX)
-        frame = render_dof(image, coc, config.NUM_LAYERS, config.MAX_BLUR_PX)
-        frame8 = np.clip(frame * 255.0, 0, 255).astype(np.uint8)
-        cv2.putText(frame8, f"Focus {focus_distance:.1f}m", (20, 44), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
-        frames.append(Image.fromarray(frame8))
+        coc = compute_coc(depth, config.FOCAL_LENGTH, sweep_aperture, focus_distance, config.SENSOR_WIDTH, width, config.MAX_BLUR_PX)
+        focus_render = render_dof(image, coc, config.NUM_LAYERS, config.MAX_BLUR_PX)
+        augmented = create_augmented_image(image, focus_render, subject_mask)
 
-    frames[0].save(output_path, save_all=True, append_images=frames[1:], duration=450, loop=0, optimize=True)
+        left = _make_labeled_panel(focus_render, "Focus Sweep", f"focus {focus_distance:.1f}m  |  f/{sweep_aperture:.1f}")
+        right = _make_labeled_panel(augmented, "Augmented", "subject preserved, background softened")
+        frame = np.hstack([left, right])
+        frames.append(Image.fromarray(np.clip(frame * 255.0, 0, 255).astype(np.uint8)))
+
+    frames[0].save(output_path, save_all=True, append_images=frames[1:], duration=520, loop=0, optimize=True)
     print(f"Saved: {output_path}")
 
 
@@ -137,6 +152,7 @@ def create_auto_assets(image, depth, output_dir, aspect, focus_distance):
         "auto_original": auto_original,
         "auto_augmented": auto_augmented,
         "crop_box": crop_box,
+        "subject_mask": subject_mask,
     }
 
 
@@ -183,7 +199,7 @@ def generate_webpage_assets(image_path, output_dir, focus, interactive_focus, as
         aperture_result = render_dof(image, aperture_coc, config.NUM_LAYERS, config.MAX_BLUR_PX)
         save_rgb(aperture_result, output_dir / f"f{aperture:.1f}.jpg")
 
-    create_focus_sweep_gif(image, depth, output_dir / "focus-sweep.gif")
+    create_focus_sweep_gif(image, depth, auto_assets["subject_mask"], output_dir / "focus-sweep.gif")
 
     build_pipeline_diagram(
         images=[
