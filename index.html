@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automatic Photo Augmentation | CS766 Project</title>
+    <style>
+        :root {
+            --bg: #f6f2ea;
+            --paper: #fffdf8;
+            --ink: #1f2933;
+            --muted: #5f6c78;
+            --accent: #c75d2c;
+            --accent-dark: #8f3d1d;
+            --accent-soft: #f1d8cb;
+            --line: #e7ddd1;
+            --shadow: 0 20px 45px rgba(56, 38, 24, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(199, 93, 44, 0.14), transparent 32%),
+                radial-gradient(circle at top right, rgba(61, 123, 121, 0.10), transparent 28%),
+                linear-gradient(180deg, #f7efe4 0%, var(--bg) 35%, #efe7db 100%);
+            line-height: 1.6;
+        }
+
+        .page {
+            max-width: 1220px;
+            margin: 28px auto;
+            background: var(--paper);
+            border: 1px solid rgba(143, 61, 29, 0.08);
+            box-shadow: var(--shadow);
+        }
+
+        .hero {
+            padding: 60px 52px 36px;
+            background:
+                linear-gradient(135deg, rgba(20, 38, 47, 0.96), rgba(34, 56, 70, 0.90)),
+                linear-gradient(120deg, rgba(199, 93, 44, 0.20), transparent 45%);
+            color: white;
+        }
+
+        .eyebrow {
+            display: inline-block;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-size: 0.78rem;
+            margin-bottom: 18px;
+        }
+
+        h1, h2, h3 {
+            font-family: Georgia, "Times New Roman", serif;
+            font-weight: 600;
+        }
+
+        h1 {
+            font-size: clamp(2.4rem, 4vw, 4rem);
+            line-height: 1.08;
+            max-width: 10ch;
+            margin-bottom: 16px;
+        }
+
+        .hero p {
+            max-width: 74ch;
+            color: rgba(255, 255, 255, 0.84);
+            font-size: 1.02rem;
+        }
+
+        .hero-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+            margin-top: 28px;
+        }
+
+        .meta-card {
+            padding: 16px 18px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 18px;
+        }
+
+        .meta-card strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        main {
+            padding: 34px 52px 54px;
+        }
+
+        section + section {
+            margin-top: 42px;
+        }
+
+        h2 {
+            font-size: 1.95rem;
+            margin-bottom: 14px;
+            color: var(--accent-dark);
+        }
+
+        h3 {
+            font-size: 1.35rem;
+            margin-bottom: 12px;
+            color: #213744;
+        }
+
+        p {
+            color: var(--ink);
+            margin-bottom: 14px;
+        }
+
+        .lede {
+            color: var(--muted);
+            max-width: 78ch;
+        }
+
+        .abstract {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 24px;
+            align-items: start;
+            background: linear-gradient(180deg, #fffaf2, #f8f1e8);
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            padding: 26px;
+        }
+
+        .summary-list {
+            list-style: none;
+            display: grid;
+            gap: 12px;
+        }
+
+        .summary-list li {
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: rgba(199, 93, 44, 0.08);
+            border: 1px solid rgba(199, 93, 44, 0.12);
+            color: var(--ink);
+        }
+
+        .summary-list strong {
+            color: var(--accent-dark);
+        }
+
+        .full-image {
+            width: 100%;
+            border-radius: 18px;
+            box-shadow: 0 10px 24px rgba(56, 38, 24, 0.16);
+        }
+
+        .pipeline-grid,
+        .card-grid,
+        .info-grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .pipeline-grid {
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        }
+
+        .card-grid {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .info-grid {
+            grid-template-columns: 1.1fr 0.9fr;
+        }
+
+        .card,
+        .panel {
+            background: white;
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            padding: 22px;
+            box-shadow: 0 8px 18px rgba(56, 38, 24, 0.06);
+        }
+
+        .card-number {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 14px;
+            background: var(--accent);
+            color: white;
+            font-weight: 700;
+        }
+
+        .card img,
+        .panel img {
+            width: 100%;
+            display: block;
+            border-radius: 16px;
+            margin-top: 14px;
+        }
+
+        .inline-tag {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent-dark);
+            font-size: 0.84rem;
+            font-weight: 700;
+        }
+
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 20px 0 22px;
+        }
+
+        .tab {
+            border: 1px solid var(--line);
+            background: #fff7f2;
+            color: var(--muted);
+            padding: 12px 18px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: 0.2s ease;
+            font-size: 0.96rem;
+        }
+
+        .tab:hover,
+        .tab.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .comparison-container {
+            margin-top: 16px;
+        }
+
+        .img-comp-container {
+            position: relative;
+            height: 560px;
+            overflow: hidden;
+            border-radius: 22px;
+            background: #111;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+        }
+
+        .img-comp-img {
+            position: absolute;
+            inset: 0;
+        }
+
+        .img-comp-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: center;
+            background: #111;
+        }
+
+        .img-comp-overlay {
+            clip-path: inset(0 0 0 50%);
+        }
+
+        .img-comp-slider {
+            position: absolute;
+            z-index: 2;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: 3px solid white;
+            background: var(--accent);
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+            cursor: ew-resize;
+        }
+
+        .img-comp-slider::before,
+        .img-comp-slider::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            width: 12px;
+            height: 12px;
+            border-top: 2px solid white;
+            border-right: 2px solid white;
+        }
+
+        .img-comp-slider::before {
+            left: 14px;
+            transform: translateY(-50%) rotate(-135deg);
+        }
+
+        .img-comp-slider::after {
+            right: 14px;
+            transform: translateY(-50%) rotate(45deg);
+        }
+
+        .img-comp-slider span {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 3px;
+            height: 180vh;
+            transform: translate(-50%, -50%);
+            background: white;
+        }
+
+        .comparison-labels {
+            display: flex;
+            justify-content: space-between;
+            color: var(--muted);
+            font-weight: 700;
+            margin-top: 12px;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 18px;
+            margin-top: 16px;
+        }
+
+        .gallery-item {
+            background: white;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 8px 18px rgba(56, 38, 24, 0.07);
+        }
+
+        .gallery-item img {
+            width: 100%;
+            display: block;
+        }
+
+        .gallery-caption {
+            padding: 14px 16px 16px;
+            color: var(--muted);
+        }
+
+        .gallery-caption strong {
+            color: var(--accent-dark);
+        }
+
+        .feature-list {
+            list-style: none;
+            display: grid;
+            gap: 10px;
+        }
+
+        .feature-list li {
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: #fff7f2;
+            border: 1px solid rgba(199, 93, 44, 0.10);
+        }
+
+        .code-block {
+            background: #202733;
+            color: #f4f1ed;
+            padding: 18px;
+            border-radius: 18px;
+            overflow-x: auto;
+            font-family: "Courier New", monospace;
+            font-size: 0.92rem;
+            white-space: pre-wrap;
+        }
+
+        .filter-img-wrap {
+            aspect-ratio: 4 / 5;
+            overflow: hidden;
+        }
+
+        .filter-img-wrap img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            transition: transform 0.3s ease;
+        }
+
+        .filter-card {
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .filter-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 14px 34px rgba(56, 38, 24, 0.14);
+        }
+
+        .filter-card:hover .filter-img-wrap img {
+            transform: scale(1.04);
+        }
+
+        footer {
+            padding: 28px 52px 42px;
+            color: var(--muted);
+            border-top: 1px solid var(--line);
+        }
+
+        @media (max-width: 900px) {
+            .abstract,
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .page {
+                margin: 0;
+                border: none;
+                box-shadow: none;
+            }
+
+            .hero,
+            main,
+            footer {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+
+            .img-comp-container {
+                height: 360px;
+            }
+
+            .comparison-labels {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <header class="hero">
+            <div class="eyebrow">CS766 Final Project</div>
+            <h1>Automatic Photo Augmentation from a Single Image</h1>
+            <p>
+                This project turns a single photo into a fully automatic editing workflow.
+                The system identifies the main subject, estimates depth, adjusts composition with an adaptive crop,
+                and applies lightweight style enhancement without requiring manual retouching.
+            </p>
+            <div class="hero-meta">
+                <div class="meta-card">
+                    <strong>Team</strong>
+                    Jiapeng Zeng, Heyan Zhang, Lanxi Zhang
+                </div>
+                <div class="meta-card">
+                    <strong>Course</strong>
+                    University of Wisconsin-Madison, CS766
+                </div>
+                <div class="meta-card">
+                    <strong>Project Focus</strong>
+                    Subject emphasis, smart crop, and automatic photo augmentation
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <section>
+                <h2>Overview</h2>
+                <div class="abstract">
+                    <div>
+                        <p>
+                            Many photos fail not because the scene is bad, but because the chosen framing, focus, or style does not match the subject a user actually cares about. Our proposal reframes the task as perceptual post-capture optimization: automatically identify the most important region, emphasize it, and render a more intentional image.
+                        </p>
+                        <p>
+                            We frame the task as perceptual post-capture optimization: detect the visually important region, organize the composition around it, and render a stronger final image automatically.
+                        </p>
+                    </div>
+                    <ul class="summary-list">
+                        <li><strong>Input:</strong> one RGB photograph</li>
+                        <li><strong>Automatic subject emphasis:</strong> depth, contrast, saturation, and center priors</li>
+                        <li><strong>Composition adjustment:</strong> adaptive crop guided by subject placement</li>
+                        <li><strong>Output:</strong> a refocused and photo-enhanced image with clearer visual hierarchy</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section>
+                <h2>Pipeline</h2>
+                <p class="lede">
+                    The demo pipeline below shows the full CS766 flow from the original photo to the final augmented result.
+                </p>
+                <img class="full-image" src="webpage_images/pipeline-diagram.jpg" alt="CS766 pipeline diagram">
+                <div class="pipeline-grid" style="margin-top: 22px;">
+                    <div class="card">
+                        <div class="card-number">1</div>
+                        <h3>Depth Estimation</h3>
+                        <p>We estimate monocular depth with Depth Anything V2 when the environment supports it, and fall back to a heuristic pseudo-depth prior when local torch and torchvision versions are mismatched.</p>
+                        <span class="inline-tag">Robust demo path</span>
+                    </div>
+                    <div class="card">
+                        <div class="card-number">2</div>
+                        <h3>Automatic Subject Prior</h3>
+                        <p>We combine near-depth preference, local contrast, saturation, edge strength, and a soft center bias to infer which region is most likely to be the intended subject.</p>
+                        <span class="inline-tag">No manual click required</span>
+                    </div>
+                    <div class="card">
+                        <div class="card-number">3</div>
+                        <h3>Adaptive Focus and Crop</h3>
+                        <p>The subject prior drives automatic focus distance estimation and a crop box that tries to keep the subject comfortably framed while improving balance.</p>
+                        <span class="inline-tag">Composition aware</span>
+                    </div>
+                    <div class="card">
+                        <div class="card-number">4</div>
+                        <h3>Style Enhancement</h3>
+                        <p>We apply lightweight local contrast, color, and detail enhancement, with stronger sharpening concentrated around the automatically selected subject.</p>
+                        <span class="inline-tag">Presentation ready</span>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Method Details</h2>
+                <div class="card-grid">
+                    <div class="card">
+                        <h3>Depth and Geometry</h3>
+                        <p>Dense depth estimation gives us a rough geometric layout. We smooth and remap the depth field before using it for focus simulation and subject ranking.</p>
+                        <img src="webpage_images/method-depth.jpg" alt="Depth method visualization">
+                    </div>
+                    <div class="card">
+                        <h3>Depth-Aware Rendering</h3>
+                        <p>We compute a Circle of Confusion map and blend multiple blur layers to produce depth-aware focus effects that strengthen subject separation before the final enhancement step.</p>
+                        <img src="webpage_images/method-refocus.jpg" alt="Refocus method visualization">
+                    </div>
+                    <div class="card">
+                        <h3>Automatic Augmentation</h3>
+                        <p>The detected subject prior drives a crop and enhancement pass that directly improves framing, emphasis, and presentation quality in the final image.</p>
+                        <img src="webpage_images/method-augment.jpg" alt="Automatic augmentation summary">
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Interactive Results</h2>
+                <p class="lede">
+                    These examples compare the input photo, depth-aware rendering outputs, and the final automatic augmentation stage.
+                </p>
+                <div class="tabs">
+                    <button class="tab active" onclick="showTab(event, 'depth-comparison')">Depth</button>
+                    <button class="tab" onclick="showTab(event, 'refocus-comparison')">Refocus</button>
+                    <button class="tab" onclick="showTab(event, 'auto-augment')">Auto Augment</button>
+                    <button class="tab" onclick="showTab(event, 'aperture-comparison')">Aperture</button>
+                    <button class="tab" onclick="showTab(event, 'focus-sweep')">Focus Sweep</button>
+                </div>
+
+                <div id="depth-comparison" class="tab-content active">
+                    <h3>Original vs. Depth Prior</h3>
+                    <p>Drag the handle to compare the input photograph against the estimated depth visualization.</p>
+                    <div class="comparison-container">
+                        <div class="img-comp-container">
+                            <div class="img-comp-img">
+                                <img src="webpage_images/original.jpg" alt="Original image">
+                            </div>
+                            <div class="img-comp-img img-comp-overlay">
+                                <img src="webpage_images/depth.jpg" alt="Depth map">
+                            </div>
+                        </div>
+                        <div class="comparison-labels">
+                            <span>Original</span>
+                            <span>Depth prior</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="refocus-comparison" class="tab-content">
+                    <h3>Original vs. Refocused</h3>
+                    <p>This component uses the estimated focus distance and depth map to synthesize a shallower depth of field.</p>
+                    <div class="comparison-container">
+                        <div class="img-comp-container">
+                            <div class="img-comp-img">
+                                <img src="webpage_images/original.jpg" alt="Original image">
+                            </div>
+                            <div class="img-comp-img img-comp-overlay">
+                                <img src="webpage_images/refocused.jpg" alt="Refocused image">
+                            </div>
+                        </div>
+                        <div class="comparison-labels">
+                            <span>Original</span>
+                            <span>Refocused</span>
+                        </div>
+                    </div>
+                    <div class="panel" style="margin-top: 18px;">
+                        <h3>CoC Visualization</h3>
+                        <p>The Circle of Confusion map highlights where the renderer assigns stronger blur.</p>
+                        <img src="webpage_images/coc.jpg" alt="CoC map">
+                    </div>
+                </div>
+
+                <div id="auto-augment" class="tab-content">
+                    <h3>Automatic Augmentation Result</h3>
+                    <p>The left image is the adaptive crop before enhancement. The right image is the final augmented result.</p>
+                    <div class="info-grid">
+                        <div>
+                            <div class="comparison-container">
+                                <div class="img-comp-container">
+                                    <div class="img-comp-img">
+                                        <img src="webpage_images/auto_original.jpg" alt="Adaptive crop original">
+                                    </div>
+                                    <div class="img-comp-img img-comp-overlay">
+                                        <img src="webpage_images/auto_augmented.jpg" alt="Automatic augmentation output">
+                                    </div>
+                                </div>
+                                <div class="comparison-labels">
+                                    <span>Adaptive crop</span>
+                                    <span>Final augment</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="panel">
+                            <h3>Subject Prior and Crop</h3>
+                            <p>The overlay shows the saliency prior, the detected subject box, and the crop selected for final enhancement.</p>
+                            <img src="webpage_images/auto_subject.jpg" alt="Automatic subject overlay">
+                        </div>
+                    </div>
+                    <div class="panel" style="margin-top: 18px;">
+                        <h3>Summary Strip</h3>
+                        <img src="webpage_images/auto_summary.jpg" alt="Automatic augmentation summary strip">
+                    </div>
+                </div>
+
+                <div id="aperture-comparison" class="tab-content">
+                    <h3>Depth-of-Field Sweep Across Apertures</h3>
+                    <p>These samples show how the renderer responds when the aperture changes.</p>
+                    <div class="gallery-grid">
+                        <div class="gallery-item">
+                            <img src="webpage_images/f1.0.jpg" alt="f1.0">
+                            <div class="gallery-caption"><strong>f/1.0</strong><br>Extreme background blur</div>
+                        </div>
+                        <div class="gallery-item">
+                            <img src="webpage_images/f1.4.jpg" alt="f1.4">
+                            <div class="gallery-caption"><strong>f/1.4</strong><br>Very shallow depth of field</div>
+                        </div>
+                        <div class="gallery-item">
+                            <img src="webpage_images/f2.8.jpg" alt="f2.8">
+                            <div class="gallery-caption"><strong>f/2.8</strong><br>Strong portrait-style emphasis</div>
+                        </div>
+                        <div class="gallery-item">
+                            <img src="webpage_images/f5.6.jpg" alt="f5.6">
+                            <div class="gallery-caption"><strong>f/5.6</strong><br>Moderate blur</div>
+                        </div>
+                        <div class="gallery-item">
+                            <img src="webpage_images/f8.0.jpg" alt="f8.0">
+                            <div class="gallery-caption"><strong>f/8.0</strong><br>Deeper focus</div>
+                        </div>
+                        <div class="gallery-item">
+                            <img src="webpage_images/f11.0.jpg" alt="f11.0">
+                            <div class="gallery-caption"><strong>f/11.0</strong><br>Minimal synthetic blur</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="focus-sweep" class="tab-content">
+                    <h3>Automatic Focus Sweep</h3>
+                    <p>This animation now shows two synchronized views: the current focus render on the left and the final augmented result on the right, so the change in focus and the enhancement pass are both visible.</p>
+                    <div class="panel">
+                        <img src="webpage_images/focus-sweep.gif" alt="Focus sweep animation">
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Implementation</h2>
+                <div class="card-grid">
+                    <div class="panel">
+                        <h3>Core Components</h3>
+                        <ul class="feature-list">
+                            <li>Depth Anything V2 or pseudo-depth fallback for robust demo execution</li>
+                            <li>Depth-aware Circle of Confusion renderer for controllable focus effects</li>
+                            <li>Automatic subject saliency from depth, contrast, saturation, and center priors</li>
+                            <li>Adaptive crop and subject-aware enhancement for final photo augmentation</li>
+                        </ul>
+                    </div>
+                    <div class="panel">
+                        <h3>Command Examples</h3>
+                        <div class="code-block">python CS766_Project/CS766_AutoPhoto_Core/auto_augment.py Image_Folder/pic-24.jpg --output-dir Auto_Augment_Results
+
+python CS766_Project/CS766_AutoPhoto_Webpage/prepare_webpage_images.py Image_Folder/pic-24.jpg --output-dir CS766_Project/CS766_AutoPhoto_Webpage/webpage_images
+
+python CS766_Project/CS766_AutoPhoto_Webpage/update_html_paths.py webpage_images</div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="film-styles">
+                <h2>Film Style Presets</h2>
+                <p class="lede">
+                    Beyond depth-of-field simulation, the pipeline supports personalised colour grading
+                    inspired by classic film stocks and cinematic looks. Each preset adjusts tone curves,
+                    saturation, shadow and highlight tints, spatially-correlated film grain, and a
+                    subject-anchored vignette — all applied after the subject-aware augmentation stage
+                    so the look is consistent regardless of composition.
+                </p>
+
+                <div class="gallery-grid" style="grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); margin-top: 24px;">
+
+                    <div class="gallery-item filter-card">
+                        <div class="filter-img-wrap">
+                            <img src="webpage_images/filter_kodak_portra.jpg" alt="Kodak Portra 400" loading="lazy">
+                        </div>
+                        <div class="gallery-caption">
+                            <strong>Kodak Portra 400</strong><br>
+                            Warm skin tones · lifted shadows · fine grain
+                        </div>
+                    </div>
+
+                    <div class="gallery-item filter-card">
+                        <div class="filter-img-wrap">
+                            <img src="webpage_images/filter_fuji_velvia.jpg" alt="Fuji Velvia 50" loading="lazy">
+                        </div>
+                        <div class="gallery-caption">
+                            <strong>Fuji Velvia 50</strong><br>
+                            Punchy saturation · cool shadows · landscape look
+                        </div>
+                    </div>
+
+                    <div class="gallery-item filter-card">
+                        <div class="filter-img-wrap">
+                            <img src="webpage_images/filter_fuji_pro400h.jpg" alt="Fuji Pro 400H" loading="lazy">
+                        </div>
+                        <div class="gallery-caption">
+                            <strong>Fuji Pro 400H</strong><br>
+                            Pastel · airy · cool cast · portrait favourite
+                        </div>
+                    </div>
+
+                    <div class="gallery-item filter-card">
+                        <div class="filter-img-wrap">
+                            <img src="webpage_images/filter_cinestill_800t.jpg" alt="CineStill 800T" loading="lazy">
+                        </div>
+                        <div class="gallery-caption">
+                            <strong>CineStill 800T</strong><br>
+                            Tungsten balanced · halation glow · neon &amp; night
+                        </div>
+                    </div>
+
+                    <div class="gallery-item filter-card">
+                        <div class="filter-img-wrap">
+                            <img src="webpage_images/filter_ilford_hp5.jpg" alt="Ilford HP5" loading="lazy">
+                        </div>
+                        <div class="gallery-caption">
+                            <strong>Ilford HP5</strong><br>
+                            Classic B&amp;W · medium grain · wide exposure latitude
+                        </div>
+                    </div>
+
+                    <div class="gallery-item filter-card">
+                        <div class="filter-img-wrap">
+                            <img src="webpage_images/filter_kodak_trix.jpg" alt="Kodak Tri-X" loading="lazy">
+                        </div>
+                        <div class="gallery-caption">
+                            <strong>Kodak Tri-X</strong><br>
+                            High contrast · coarse grain · gritty documentary
+                        </div>
+                    </div>
+
+                    <div class="gallery-item filter-card">
+                        <div class="filter-img-wrap">
+                            <img src="webpage_images/filter_teal_orange.jpg" alt="Teal &amp; Orange" loading="lazy">
+                        </div>
+                        <div class="gallery-caption">
+                            <strong>Teal &amp; Orange</strong><br>
+                            Hollywood blockbuster · warm highlights · cool shadows
+                        </div>
+                    </div>
+
+                    <div class="gallery-item filter-card">
+                        <div class="filter-img-wrap">
+                            <img src="webpage_images/filter_vintage_faded.jpg" alt="Vintage Faded" loading="lazy">
+                        </div>
+                        <div class="gallery-caption">
+                            <strong>Vintage Faded</strong><br>
+                            Lifted blacks · warm cast · worn film feel
+                        </div>
+                    </div>
+
+                </div>
+
+            </section>
+
+            <section>
+                <h2>Challenges and Next Steps</h2>
+                <div class="card-grid">
+                    <div class="panel">
+                        <h3>Current Challenges</h3>
+                        <ul class="feature-list">
+                            <li>Monocular depth still introduces edge errors around thin structures and cluttered scenes.</li>
+                            <li>The subject heuristic is effective for demos, but it is not yet learned end-to-end from user preference data.</li>
+                            <li>Automatic cropping can fail on unusual compositions where the intended subject is not the most salient region.</li>
+                        </ul>
+                    </div>
+                    <div class="panel">
+                        <h3>Future Work</h3>
+                        <ul class="feature-list">
+                            <li>Train a learned importance predictor for subject emphasis rather than using heuristics alone.</li>
+                            <li>Add multiple target aspect ratios and platform-specific crop presets.</li>
+                            <li>Introduce stronger style controls so users can choose portrait, editorial, or cinematic output modes.</li>
+                            <li>Connect the pipeline to a simple web upload interface for live demos.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>CS766 Project Website | University of Wisconsin-Madison</p>
+            <p>Automatic photo augmentation with depth-aware subject emphasis, adaptive crop, and enhancement.</p>
+        </footer>
+    </div>
+
+    <script>
+        function initComparisons() {
+            const containers = document.querySelectorAll(".img-comp-container");
+            containers.forEach((container) => {
+                const existing = container.querySelector(".img-comp-slider");
+                if (existing) {
+                    existing.remove();
+                }
+
+                const overlay = container.querySelector(".img-comp-overlay");
+                if (!overlay) {
+                    return;
+                }
+
+                overlay.style.clipPath = "inset(0 0 0 50%)";
+                const slider = document.createElement("div");
+                slider.className = "img-comp-slider";
+                const divider = document.createElement("span");
+                slider.appendChild(divider);
+                container.appendChild(slider);
+                slider.style.left = "50%";
+
+                let active = false;
+
+                function moveSlider(event) {
+                    if (!active) {
+                        return;
+                    }
+                    event.preventDefault();
+                    const rect = container.getBoundingClientRect();
+                    const pageX = event.touches ? event.touches[0].clientX : event.clientX;
+                    let percent = ((pageX - rect.left) / rect.width) * 100;
+                    percent = Math.max(0, Math.min(100, percent));
+                    overlay.style.clipPath = `inset(0 0 0 ${percent}%)`;
+                    slider.style.left = `${percent}%`;
+                }
+
+                slider.addEventListener("mousedown", () => {
+                    active = true;
+                });
+                slider.addEventListener("touchstart", (event) => {
+                    active = true;
+                    event.preventDefault();
+                });
+
+                document.addEventListener("mouseup", () => {
+                    active = false;
+                });
+                document.addEventListener("touchend", () => {
+                    active = false;
+                });
+
+                container.addEventListener("mousemove", moveSlider);
+                container.addEventListener("touchmove", moveSlider, { passive: false });
+            });
+        }
+
+        function showTab(event, tabId) {
+            document.querySelectorAll(".tab-content").forEach((tab) => tab.classList.remove("active"));
+            document.querySelectorAll(".tab").forEach((button) => button.classList.remove("active"));
+            document.getElementById(tabId).classList.add("active");
+            event.currentTarget.classList.add("active");
+            setTimeout(initComparisons, 80);
+        }
+
+        window.addEventListener("load", initComparisons);
+    </script>
+</body>
+</html>
