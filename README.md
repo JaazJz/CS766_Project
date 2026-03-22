@@ -21,4 +21,5 @@ python3.12 CS766_AutoPhoto_Webpage/prepare_webpage_images.py Image_Folder/pic-24
 
 python3.12 CS766_AutoPhoto_Webpage/update_html_paths.py CS766_AutoPhoto_Webpage/webpage_images
 ```
-## Access the webpage with following link: https://jaazjz.github.io/CS766_Project/
+## Access the webpage with following link: 
+https://jaazjz.github.io/CS766_Project/
