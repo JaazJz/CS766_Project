@@ -26,6 +26,15 @@ IMAGE_NAMES = [
     "auto_augmented.jpg",
     "auto_subject.jpg",
     "auto_summary.jpg",
+    # Film filter variants
+    "filter_kodak_portra.jpg",
+    "filter_fuji_velvia.jpg",
+    "filter_fuji_pro400h.jpg",
+    "filter_cinestill_800t.jpg",
+    "filter_ilford_hp5.jpg",
+    "filter_kodak_trix.jpg",
+    "filter_teal_orange.jpg",
+    "filter_vintage_faded.jpg",
 ]
 
 

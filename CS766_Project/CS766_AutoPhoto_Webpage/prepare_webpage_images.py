@@ -34,6 +34,7 @@ from augmentation_utils import (
 )
 from depth_utils import compute_coc, process_depth, select_focus_interactive
 from renderer import render_dof, save_image
+from filter_utils import apply_film_filter, list_styles
 
 
 def save_rgb(image, output_path, quality=95):
@@ -120,8 +121,9 @@ def create_focus_sweep_gif(image, depth, subject_mask, output_path, num_frames=8
     print(f"Saved: {output_path}")
 
 
-def create_auto_assets(image, depth, output_dir, aspect, focus_distance):
-    saliency = compute_subject_saliency(image, depth)
+def create_auto_assets(image, depth, output_dir, aspect, focus_distance,
+                       subject_mode="auto", filter_strength=1.0):
+    saliency = compute_subject_saliency(image, depth, subject_mode=subject_mode)
     subject_mask, subject_bbox = extract_subject_mask(saliency)
 
     if focus_distance is None:
@@ -136,13 +138,27 @@ def create_auto_assets(image, depth, output_dir, aspect, focus_distance):
     auto_original = crop_array(image, crop_box)
     auto_augmented = create_augmented_image(auto_original, crop_array(refocused, crop_box), crop_array(subject_mask, crop_box))
     auto_subject = create_overlay(image, saliency, subject_bbox=subject_bbox, crop_box=crop_box)
-    auto_summary = create_summary_panel(auto_original, crop_array(auto_subject, crop_box), auto_augmented)
+    # Full original | full overlay with boxes | augmented result
+    auto_summary = create_summary_panel(image, auto_subject, auto_augmented)
 
     save_rgb(auto_original, output_dir / "auto_original.jpg")
     save_rgb(auto_augmented, output_dir / "auto_augmented.jpg")
     save_rgb(auto_subject, output_dir / "auto_subject.jpg")
     save_rgb(auto_summary, output_dir / "auto_summary.jpg")
     save_rgb(auto_summary, output_dir / "method-augment.jpg")
+
+    # Save all film filter variants for the webpage filter-styles section
+    mask_ys, mask_xs = np.where(crop_array(subject_mask, crop_box) > 0.15)
+    subj_cx = float(mask_xs.mean()) if len(mask_xs) else None
+    subj_cy = float(mask_ys.mean()) if len(mask_ys) else None
+    for style in list_styles():
+        filtered = apply_film_filter(
+            auto_augmented, style,
+            strength=filter_strength,
+            subject_cx=subj_cx, subject_cy=subj_cy,
+        )
+        save_rgb(filtered, output_dir / f"filter_{style}.jpg")
+        print(f"  Filter saved: filter_{style}.jpg")
 
     return {
         "focus_distance": float(focus_distance),
@@ -168,7 +184,8 @@ def create_method_images(image, depth_color, refocused, auto_summary, output_dir
     save_rgb(auto_summary, output_dir / "method-augment.jpg")
 
 
-def generate_webpage_assets(image_path, output_dir, focus, interactive_focus, aspect):
+def generate_webpage_assets(image_path, output_dir, focus, interactive_focus, aspect,
+                            subject_mode="auto", filter_strength=1.0):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     image = np.array(Image.open(image_path).convert("RGB")).astype(np.float32) / 255.0
@@ -185,7 +202,8 @@ def generate_webpage_assets(image_path, output_dir, focus, interactive_focus, as
     if interactive_focus and focus_distance is None:
         focus_distance = select_focus_interactive(image, depth)
 
-    auto_assets = create_auto_assets(image, depth, output_dir, aspect, focus_distance)
+    auto_assets = create_auto_assets(image, depth, output_dir, aspect, focus_distance,
+                                     subject_mode=subject_mode, filter_strength=filter_strength)
 
     refocused = auto_assets["refocused"]
     save_rgb(refocused, output_dir / "refocused.jpg")
@@ -226,6 +244,19 @@ def main():
     parser.add_argument("--aspect", default="4:5", help="Target crop aspect ratio for automatic augmentation")
     parser.add_argument("--focal", type=float, help="Override focal length in mm")
     parser.add_argument("--aperture", type=float, help="Override f-number")
+    parser.add_argument(
+        "--subject-mode",
+        choices=["auto", "people", "scene"],
+        default="auto",
+        help="Subject detection mode: auto / people / scene (default: auto)",
+    )
+    parser.add_argument(
+        "--filter-strength",
+        type=float,
+        default=1.0,
+        metavar="S",
+        help="Film filter intensity 0.0-1.0 (default: 1.0)",
+    )
     args = parser.parse_args()
 
     if args.focal:
@@ -250,6 +281,8 @@ def main():
         focus=args.focus,
         interactive_focus=args.interactive_focus,
         aspect=args.aspect,
+        subject_mode=args.subject_mode,
+        filter_strength=args.filter_strength,
     )
 
 

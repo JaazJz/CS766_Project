@@ -25,44 +25,146 @@ def normalize_map(values):
     return (values - v_min) / (v_max - v_min)
 
 
-def compute_subject_saliency(image, depth_map):
-    """Heuristic subject prior from depth, local contrast, saturation, and center bias."""
+def _detect_people_hog(rgb8):
+    """HOG person detector. Returns list of (x, y, w, h, conf) in original coords."""
+    height, width = rgb8.shape[:2]
+    scale = min(1.0, 800 / max(height, width))
+    small_w = max(64, int(round(width * scale)))
+    small_h = max(64, int(round(height * scale)))
+    small = cv2.resize(rgb8, (small_w, small_h), interpolation=cv2.INTER_AREA)
+    hog = cv2.HOGDescriptor()
+    hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+    rects, weights = hog.detectMultiScale(
+        cv2.cvtColor(small, cv2.COLOR_RGB2GRAY),
+        winStride=(8, 8), padding=(16, 16), scale=1.05,
+    )
+    detections = []
+    if len(rects):
+        for (rx, ry, rw, rh), w in zip(rects, weights):
+            detections.append((int(rx/scale), int(ry/scale),
+                               int(rw/scale), int(rh/scale),
+                               float(np.clip(w, 0.0, 2.0))))
+    return detections
+
+
+def _people_prominence(detections, img_width, img_height):
+    """Score [0,1]: how much are people the intended subject vs. the scene."""
+    if not detections:
+        return 0.0
+    img_area = img_width * img_height
+    edge_margin = 0.12
+    total_af, cx_list, cy_list, conf_list, clip_pen = 0.0, [], [], [], 0.0
+    for (x, y, w, h, conf) in detections:
+        af = (w * h) / img_area
+        total_af += af
+        cx_list.append((x + w / 2) / img_width)
+        cy_list.append((y + h / 2) / img_height)
+        conf_list.append(conf)
+        if (x < img_width * edge_margin
+                or (x + w) > img_width * (1 - edge_margin)
+                or y < img_height * edge_margin
+                or (y + h) > img_height * (1 - edge_margin)):
+            clip_pen += af
+    dist = np.sqrt((np.mean(cx_list) - 0.5)**2 + (np.mean(cy_list) - 0.5)**2)
+    centrality  = float(np.clip(1.0 - dist * 2.0, 0.0, 1.0))
+    area_score  = float(np.clip((total_af - 0.03) / 0.12, 0.0, 1.0))
+    clip_factor = float(np.clip(1.0 - clip_pen * 4.0, 0.0, 1.0))
+    mean_conf   = float(np.mean(conf_list))
+    p = (area_score * 0.45 + centrality * 0.35 + (mean_conf / 2.0) * 0.20)
+    return float(np.clip(p * clip_factor, 0.0, 1.0))
+
+
+def compute_subject_saliency(image, depth_map, subject_mode="auto"):
+    """
+    Adaptive saliency map with three modes:
+
+    subject_mode='scene'  – depth + contrast heuristic only (good for
+                            landscapes, architecture, street environments).
+    subject_mode='people' – HOG person heatmap dominates regardless of size.
+    subject_mode='auto'   – decides automatically via _people_prominence:
+                            < 0.25 → scene, 0.25-0.55 → blend, > 0.55 → people.
+    """
     rgb8 = np.clip(image * 255.0, 0, 255).astype(np.uint8)
     gray = cv2.cvtColor(rgb8, cv2.COLOR_RGB2GRAY).astype(np.float32) / 255.0
-    hsv = cv2.cvtColor(rgb8, cv2.COLOR_RGB2HSV).astype(np.float32) / 255.0
-
-    depth_norm = normalize_map(depth_map)
-    near_prior = 1.0 - depth_norm
-
-    blur = cv2.GaussianBlur(gray, (0, 0), 5.0)
-    local_contrast = normalize_map(np.abs(gray - blur))
-    edge_strength = normalize_map(np.abs(cv2.Laplacian(gray, cv2.CV_32F, ksize=3)))
-    saturation = normalize_map(hsv[:, :, 1])
-
+    hsv  = cv2.cvtColor(rgb8, cv2.COLOR_RGB2HSV).astype(np.float32) / 255.0
     height, width = gray.shape
-    yy, xx = np.mgrid[0:height, 0:width].astype(np.float32)
-    xx = xx / max(width - 1, 1)
-    yy = yy / max(height - 1, 1)
-    center_bias = np.exp(-(((xx - 0.5) ** 2) / 0.10 + ((yy - 0.45) ** 2) / 0.16))
-    center_bias = normalize_map(center_bias)
 
-    saliency = (
-        0.42 * near_prior
-        + 0.20 * local_contrast
-        + 0.16 * edge_strength
-        + 0.10 * saturation
-        + 0.12 * center_bias
+    # ── Scene signals (original weights, unchanged) ───────────────────────────
+    near_prior     = normalize_map(1.0 - normalize_map(depth_map))
+    blur           = cv2.GaussianBlur(gray, (0, 0), 5.0)
+    local_contrast = normalize_map(np.abs(gray - blur))
+    edge_strength  = normalize_map(np.abs(cv2.Laplacian(gray, cv2.CV_32F, ksize=3)))
+    saturation     = normalize_map(hsv[:, :, 1])
+    yy, xx = np.mgrid[0:height, 0:width].astype(np.float32)
+    xx /= max(width - 1, 1);  yy /= max(height - 1, 1)
+    center_bias = normalize_map(
+        np.exp(-(((xx - 0.5)**2) / 0.10 + ((yy - 0.45)**2) / 0.16))
     )
+    scene_sal = (0.42 * near_prior + 0.20 * local_contrast
+                 + 0.16 * edge_strength + 0.10 * saturation + 0.12 * center_bias)
+
+    # ── Determine effective blend weight ─────────────────────────────────────
+    detections = _detect_people_hog(rgb8)
+    prominence = _people_prominence(detections, width, height)
+
+    if subject_mode == "scene":
+        effective_alpha = 0.0
+    elif subject_mode == "people":
+        effective_alpha = 1.0 if detections else 0.0
+    else:  # auto
+        if prominence > 0.55:
+            effective_alpha = 1.0
+        elif prominence > 0.25:
+            effective_alpha = (prominence - 0.25) / 0.30
+        else:
+            effective_alpha = 0.0
+
+    mode_label = (subject_mode if subject_mode != "auto"
+                  else ("people" if prominence > 0.55
+                        else "blend" if prominence > 0.25 else "scene"))
+    print(f"  Subject mode: {mode_label}  "
+          f"(prominence={prominence:.2f}, {len(detections)} detection(s))")
+
+    if effective_alpha < 0.01 or not detections:
+        saliency = scene_sal
+    else:
+        person_map = np.zeros((height, width), dtype=np.float32)
+        for (px, py, pw, ph, conf) in detections:
+            cx, cy = px + pw / 2.0, py + ph / 2.0
+            sx, sy = max(pw * 0.35, 8.0), max(ph * 0.35, 8.0)
+            yy2, xx2 = np.mgrid[0:height, 0:width].astype(np.float32)
+            blob = conf * np.exp(-(((xx2 - cx)**2) / (2*sx**2)
+                                   + ((yy2 - cy)**2) / (2*sy**2)))
+            person_map = np.maximum(person_map, blob)
+        person_map = normalize_map(person_map)
+        people_sal = (0.55 * person_map + 0.25 * near_prior
+                      + 0.10 * local_contrast + 0.06 * edge_strength
+                      + 0.04 * saturation)
+        saliency = (1.0 - effective_alpha) * scene_sal + effective_alpha * people_sal
+
     saliency = cv2.GaussianBlur(saliency.astype(np.float32), (0, 0), 5.0)
     return normalize_map(saliency)
 
 
 def extract_subject_mask(saliency_map):
-    """Find the dominant salient region and return a cleaned mask and bounding box."""
+    """
+    Find the dominant salient region and return a cleaned mask and bounding box.
+
+    FIX: kernel size and minimum component area now scale with image dimensions,
+    so a small subject in a large image gets a tighter mask rather than being
+    swamped by a fixed 7×7 kernel.
+    """
+    height, width = saliency_map.shape[:2]
+    img_area = height * width
+    img_min_dim = min(height, width)
+
     threshold = max(float(np.percentile(saliency_map, 82)), 0.45)
     binary = (saliency_map >= threshold).astype(np.uint8)
 
-    kernel = np.ones((7, 7), np.uint8)
+    # --- adaptive kernel: roughly 0.7% of the shorter image dimension, minimum 3px ---
+    k = max(3, img_min_dim // 140)
+    k = k if k % 2 == 1 else k + 1          # must be odd for symmetry
+    kernel = np.ones((k, k), np.uint8)
     binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
     binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
 
@@ -71,11 +173,13 @@ def extract_subject_mask(saliency_map):
     best_mask = None
     best_bbox = None
     best_score = -1.0
-    image_area = saliency_map.shape[0] * saliency_map.shape[1]
+
+    # --- adaptive minimum area: at least 0.5% of image area (was a hard 128px) ---
+    min_area = max(128, img_area * 0.005)
 
     for component_id in range(1, component_count):
         x, y, w, h, area = stats[component_id]
-        if area < max(128, image_area * 0.002):
+        if area < min_area:
             continue
 
         component_mask = (labels == component_id).astype(np.uint8)
@@ -90,11 +194,14 @@ def extract_subject_mask(saliency_map):
     if best_mask is None:
         best_mask = np.zeros_like(binary)
         max_y, max_x = np.unravel_index(np.argmax(saliency_map), saliency_map.shape)
-        radius = max(24, min(saliency_map.shape[:2]) // 8)
+        # fallback circle also scales with image size
+        radius = max(24, img_min_dim // 10)
         cv2.circle(best_mask, (int(max_x), int(max_y)), int(radius), 1, thickness=-1)
         best_bbox = _bbox_from_mask(best_mask)
 
-    refined = cv2.GaussianBlur(best_mask.astype(np.float32), (0, 0), 9.0)
+    # softer blur radius also scales with image
+    blur_sigma = max(5.0, img_min_dim * 0.012)
+    refined = cv2.GaussianBlur(best_mask.astype(np.float32), (0, 0), blur_sigma)
     refined = normalize_map(refined)
     return refined, best_bbox
 
@@ -130,12 +237,14 @@ def estimate_focus_distance(depth_map, subject_mask, saliency_map):
 
 
 def compute_crop_box(image_shape, subject_mask, subject_bbox, aspect_ratio_name):
+    """Simple, loose, natural crop with gentle rule-of-thirds lean."""
     height, width = image_shape[:2]
     ratio = ASPECT_RATIOS.get(aspect_ratio_name)
     if ratio is None:
         return (0, 0, width, height)
 
     x, y, box_w, box_h = subject_bbox
+
     ys, xs = np.where(subject_mask > 0.15)
     if len(xs) and len(ys):
         subject_cx = float(xs.mean())
@@ -144,35 +253,39 @@ def compute_crop_box(image_shape, subject_mask, subject_bbox, aspect_ratio_name)
         subject_cx = x + box_w / 2.0
         subject_cy = y + box_h / 2.0
 
-    pad_x = max(box_w * 0.55, width * 0.08)
-    pad_y = max(box_h * 0.60, height * 0.08)
-    min_crop_w = min(width, box_w + 2.0 * pad_x)
-    min_crop_h = min(height, box_h + 2.0 * pad_y)
+    # Crop size: subject takes ~38% of crop short side,
+    # but crop is at least 65% of the frame short side (generous context).
+    subject_ref = max(box_w, box_h)
+    crop_short = max(subject_ref / 0.38, min(width, height) * 0.65)
+    crop_short = min(crop_short, min(width, height))
 
-    crop_w = max(min_crop_w, min_crop_h * ratio)
-    crop_h = crop_w / ratio
-    if crop_h > height:
-        crop_h = float(height)
-        crop_w = crop_h * ratio
-    if crop_w > width:
-        crop_w = float(width)
+    if ratio <= 1.0:
+        crop_w = crop_short
         crop_h = crop_w / ratio
+    else:
+        crop_h = crop_short
+        crop_w = crop_h * ratio
 
-    target_x_fraction = 0.36 if subject_cx < width * 0.5 else 0.64
-    target_y_fraction = 0.40 if subject_cy < height * 0.5 else 0.56
+    if crop_w > width:
+        crop_w = float(width);  crop_h = crop_w / ratio
+    if crop_h > height:
+        crop_h = float(height); crop_w = crop_h * ratio
 
-    crop_x = subject_cx - crop_w * target_x_fraction
-    crop_y = subject_cy - crop_h * target_y_fraction
-    crop_x = float(np.clip(crop_x, 0, max(width - crop_w, 0)))
+    # Gentle thirds lean (not a hard snap)
+    sx_norm = subject_cx / max(width  - 1, 1)
+    sy_norm = subject_cy / max(height - 1, 1)
+    anchor_x = 0.50 + (sx_norm - 0.50) * 0.20
+    anchor_y = 0.50 + (sy_norm - 0.50) * 0.16
+
+    crop_x = subject_cx - crop_w * anchor_x
+    crop_y = subject_cy - crop_h * anchor_y
+    crop_x = float(np.clip(crop_x, 0, max(width  - crop_w, 0)))
     crop_y = float(np.clip(crop_y, 0, max(height - crop_h, 0)))
 
     crop_x = int(round(crop_x))
     crop_y = int(round(crop_y))
-    crop_w = int(round(crop_w))
-    crop_h = int(round(crop_h))
-
-    crop_w = min(crop_w, width - crop_x)
-    crop_h = min(crop_h, height - crop_y)
+    crop_w = int(round(min(crop_w, width  - crop_x)))
+    crop_h = int(round(min(crop_h, height - crop_y)))
     return (crop_x, crop_y, crop_w, crop_h)
 
 

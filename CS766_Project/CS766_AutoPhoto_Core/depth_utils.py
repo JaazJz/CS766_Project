@@ -113,8 +113,12 @@ def process_depth(image_path, target_width, target_height, depth_min, depth_max)
     print(f"Mapped depth range: [{Z_real.min():.2f}m, {Z_real.max():.2f}m]")
     
     # Clean up
-    Z_real = np.clip(Z_real, depth_min, depth_max)
-    Z_real = cv2.medianBlur(Z_real, 3)
+    Z_real = np.clip(Z_real, depth_min, depth_max).astype(np.float32)
+    
+    # OpenCV on some platforms does not support medianBlur for float depth maps
+    Z_u16 = ((Z_real - depth_min) / (depth_max - depth_min) * 65535).astype(np.uint16)
+    Z_u16 = cv2.medianBlur(Z_u16, 3)
+    Z_real = Z_u16.astype(np.float32) / 65535.0 * (depth_max - depth_min) + depth_min
     
     return Z_real
 
