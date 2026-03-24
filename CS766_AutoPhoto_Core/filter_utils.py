@@ -1,25 +1,5 @@
-"""
-filter_utils.py  –  Camera / film style filters for the Auto Photo pipeline.
-
-Each style is a bundle of:
-  • film grain  (luminance + chroma, spatially correlated)
-  • tone curve  (per-channel or global)
-  • color grade (shadows / midtones / highlights lift)
-  • saturation tweak
-  • vignette strength
-
-Public API
-----------
-apply_film_filter(image, style_name, strength=1.0, seed=None) -> np.ndarray
-list_styles() -> list[str]
-"""
-
 import cv2
 import numpy as np
-
-# ---------------------------------------------------------------------------
-# Style definitions
-# ---------------------------------------------------------------------------
 
 STYLES = {
     # ── COLOUR FILM ─────────────────────────────────────────────────────────
@@ -119,24 +99,13 @@ STYLES = {
 
 
 def list_styles():
-    """Return sorted list of available style names."""
     return sorted(STYLES.keys())
 
 
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
 def _build_lut(curve_pairs_flat):
-    """
-    Build a uint8 → uint8 LUT from a flat list of (in, out) control points.
-    E.g. [0, 5, 128, 135, 255, 248]  →  three knots.
-    Uses monotone cubic interpolation so the curve stays smooth.
-    """
     pts = np.array(curve_pairs_flat, dtype=np.float32).reshape(-1, 2)
     xs, ys = pts[:, 0], pts[:, 1]
 
-    # Ensure endpoints exist
     if xs[0] > 0:
         xs = np.r_[0, xs]
         ys = np.r_[ys[0], ys]
@@ -150,7 +119,6 @@ def _build_lut(curve_pairs_flat):
 
 
 def _apply_tone_curve(image_f32, curve_r, curve_g, curve_b):
-    """Apply per-channel tone curve to float [0,1] image."""
     img8 = np.clip(image_f32 * 255.0, 0, 255).astype(np.uint8)
     lut_r = _build_lut(curve_r)
     lut_g = _build_lut(curve_g)
@@ -164,14 +132,10 @@ def _apply_tone_curve(image_f32, curve_r, curve_g, curve_b):
 
 
 def _apply_color_grade(image_f32, shadow_tint, highlight_tint):
-    """
-    Additive shadow / highlight colour tint.
-    shadow_tint   – (R, G, B) offset in [0..255] scale, applied in dark regions
-    highlight_tint – same, applied in bright regions
-    """
-    luma = image_f32.mean(axis=2, keepdims=True)           # [0,1]
-    shadow_w    = np.clip(1.0 - luma * 3.0, 0.0, 1.0)    # strong in shadows
-    highlight_w = np.clip((luma - 0.6) * 3.0, 0.0, 1.0)  # strong in highlights
+
+    luma = image_f32.mean(axis=2, keepdims=True) 
+    shadow_w    = np.clip(1.0 - luma * 3.0, 0.0, 1.0) 
+    highlight_w = np.clip((luma - 0.6) * 3.0, 0.0, 1.0)
 
     s = np.array(shadow_tint,    dtype=np.float32) / 255.0
     h = np.array(highlight_tint, dtype=np.float32) / 255.0
@@ -181,7 +145,6 @@ def _apply_color_grade(image_f32, shadow_tint, highlight_tint):
 
 
 def _adjust_saturation(image_f32, factor):
-    """Scale saturation.  factor=0 → greyscale, 1 → unchanged, >1 → boosted."""
     if abs(factor - 1.0) < 1e-4 and factor > 0.05:
         return image_f32
     gray = image_f32.mean(axis=2, keepdims=True)
@@ -195,16 +158,7 @@ def _adjust_saturation(image_f32, factor):
 
 
 def _add_film_grain(image_f32, luma_amount, chroma_amount, sigma, seed=None):
-    """
-    Spatially-correlated luminance + chroma grain (much closer to real film than
-    plain Gaussian noise).
 
-    Method:
-      1. Generate white noise then blur to the desired grain size (sigma controls
-         how 'clumpy' the grain is – large sigma = coarse grain).
-      2. Scale to target RMS amplitude.
-      3. Add luminance grain uniformly; add chroma grain in Lab space.
-    """
     if luma_amount < 1e-4 and chroma_amount < 1e-4:
         return image_f32
 
@@ -218,18 +172,15 @@ def _add_film_grain(image_f32, luma_amount, chroma_amount, sigma, seed=None):
             cv2.GaussianBlur(raw[:, :, c], (0, 0), sigma)
             for c in range(color_channels)
         ], axis=2)
-        # Normalise to unit variance then scale
         std = blurred.std() + 1e-8
         return blurred / std * amount
 
     result = image_f32.copy()
 
-    # Luminance grain – add in linear RGB (affects all channels equally)
     if luma_amount > 1e-4:
         lg = _grain_layer(luma_amount, 1)          # (H, W, 1)
         result = np.clip(result + lg, 0.0, 1.0)
 
-    # Chroma grain – perturb in Lab a/b channels only
     if chroma_amount > 1e-4:
         lab = cv2.cvtColor(
             np.clip(result * 255.0, 0, 255).astype(np.uint8),
@@ -243,10 +194,7 @@ def _add_film_grain(image_f32, luma_amount, chroma_amount, sigma, seed=None):
 
 
 def _add_vignette(image_f32, strength, subject_cx=None, subject_cy=None):
-    """
-    Smooth radial vignette.  If subject center is provided, the vignette is
-    shifted slightly toward the subject for a natural look.
-    """
+
     if strength < 1e-4:
         return image_f32
 
@@ -261,10 +209,7 @@ def _add_vignette(image_f32, strength, subject_cx=None, subject_cy=None):
     vignette = 1.0 - np.clip(strength * (radial ** 1.8), 0.0, strength)
     return np.clip(image_f32 * vignette[:, :, np.newaxis], 0.0, 1.0)
 
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
+---------------------------------------------------------------------
 
 def apply_film_filter(
     image: np.ndarray,
@@ -274,40 +219,21 @@ def apply_film_filter(
     subject_cy: float = None,
     seed: int = None,
 ) -> np.ndarray:
-    """
-    Apply a named film / camera style filter to a float RGB [0,1] image.
-
-    Parameters
-    ----------
-    image       : H×W×3 float32 in [0, 1]
-    style_name  : one of list_styles()
-    strength    : 0.0 = no effect, 1.0 = full style (grain & grade linearly scaled)
-    subject_cx/cy : optional subject centre for vignette anchoring (pixels)
-    seed        : RNG seed for reproducible grain
-
-    Returns
-    -------
-    Filtered H×W×3 float32 in [0, 1]
-    """
-    if style_name not in STYLES:
+       if style_name not in STYLES:
         raise ValueError(f"Unknown style '{style_name}'. Available: {list_styles()}")
 
     s = STYLES[style_name]
     result = image.astype(np.float32).copy()
 
-    # 1. Tone curve
     result = _apply_tone_curve(result, s["curve_r"], s["curve_g"], s["curve_b"])
 
-    # 2. Saturation
     sat_target = 1.0 + (s["saturation"] - 1.0) * strength
     result = _adjust_saturation(result, sat_target)
 
-    # 3. Color grade
     sh = tuple(v * strength for v in s["shadow_tint"])
     hi = tuple(v * strength for v in s["highlight_tint"])
     result = _apply_color_grade(result, sh, hi)
 
-    # 4. Film grain
     result = _add_film_grain(
         result,
         luma_amount  = s["grain_luma"]   * strength,
@@ -316,7 +242,6 @@ def apply_film_filter(
         seed         = seed,
     )
 
-    # 5. Vignette
     result = _add_vignette(
         result,
         strength    = s["vignette"] * strength,
@@ -335,10 +260,6 @@ def apply_filter_batch(
     subject_cy: float = None,
     seed: int = None,
 ) -> dict:
-    """
-    Convenience: render multiple styles at once.
-    Returns {style_name: filtered_image}.
-    """
     return {
         name: apply_film_filter(image, name, strength, subject_cx, subject_cy, seed)
         for name in styles
@@ -346,10 +267,7 @@ def apply_filter_batch(
 
 
 def create_filter_comparison_grid(image: np.ndarray, styles: list = None) -> np.ndarray:
-    """
-    Render all (or a subset of) styles side-by-side in a labelled grid.
-    Returns uint8 RGB.
-    """
+
     if styles is None:
         styles = list_styles()
 
@@ -369,7 +287,7 @@ def create_filter_comparison_grid(image: np.ndarray, styles: list = None) -> np.
         cv2.putText(panel8, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
         labeled.append(panel8)
 
-    # Stack into rows of up to 4
+
     cols = 4
     rows = []
     for i in range(0, len(labeled), cols):
@@ -380,7 +298,6 @@ def create_filter_comparison_grid(image: np.ndarray, styles: list = None) -> np.
             row_panels.append(blank)
         rows.append(np.hstack(row_panels))
 
-    # Ensure all rows have same width
     max_w = max(r.shape[1] for r in rows)
     padded_rows = []
     for r in rows:

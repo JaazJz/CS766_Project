@@ -1,15 +1,12 @@
 import torch
-# Camera parameters
 FOCAL_LENGTH = 50.0      # mm
 F_NUMBER = 2.8           # f-stop
 SENSOR_WIDTH = 36.0      # mm (full-frame)
 MAX_BLUR_PX = 40         # pixels
 
-# Depth mapping
 DEPTH_MIN = 0.5          # meters
 DEPTH_MAX = 100.0        # meters
 
-# Rendering
 NUM_LAYERS = 20          # more = smoother but slower
 
 # Depth model
@@ -29,7 +26,6 @@ MODEL_CONFIGS = {
 ENCODER = 'vitl'
 MODEL_CHECKPOINT = f'checkpoints/depth_anything_v2_{ENCODER}.pth'
 
-# Camera presets
 PRESETS = {
     'portrait': {'FOCAL_LENGTH': 85.0, 'F_NUMBER': 1.8, 'MAX_BLUR_PX': 50},
     'landscape': {'FOCAL_LENGTH': 35.0, 'F_NUMBER': 8.0, 'MAX_BLUR_PX': 20},

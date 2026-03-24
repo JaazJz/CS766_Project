@@ -147,13 +147,6 @@ def compute_subject_saliency(image, depth_map, subject_mode="auto"):
 
 
 def extract_subject_mask(saliency_map):
-    """
-    Find the dominant salient region and return a cleaned mask and bounding box.
-
-    FIX: kernel size and minimum component area now scale with image dimensions,
-    so a small subject in a large image gets a tighter mask rather than being
-    swamped by a fixed 7×7 kernel.
-    """
     height, width = saliency_map.shape[:2]
     img_area = height * width
     img_min_dim = min(height, width)
@@ -161,7 +154,6 @@ def extract_subject_mask(saliency_map):
     threshold = max(float(np.percentile(saliency_map, 82)), 0.45)
     binary = (saliency_map >= threshold).astype(np.uint8)
 
-    # --- adaptive kernel: roughly 0.7% of the shorter image dimension, minimum 3px ---
     k = max(3, img_min_dim // 140)
     k = k if k % 2 == 1 else k + 1          # must be odd for symmetry
     kernel = np.ones((k, k), np.uint8)
@@ -174,7 +166,6 @@ def extract_subject_mask(saliency_map):
     best_bbox = None
     best_score = -1.0
 
-    # --- adaptive minimum area: at least 0.5% of image area (was a hard 128px) ---
     min_area = max(128, img_area * 0.005)
 
     for component_id in range(1, component_count):
@@ -199,7 +190,6 @@ def extract_subject_mask(saliency_map):
         cv2.circle(best_mask, (int(max_x), int(max_y)), int(radius), 1, thickness=-1)
         best_bbox = _bbox_from_mask(best_mask)
 
-    # softer blur radius also scales with image
     blur_sigma = max(5.0, img_min_dim * 0.012)
     refined = cv2.GaussianBlur(best_mask.astype(np.float32), (0, 0), blur_sigma)
     refined = normalize_map(refined)
@@ -237,7 +227,6 @@ def estimate_focus_distance(depth_map, subject_mask, saliency_map):
 
 
 def compute_crop_box(image_shape, subject_mask, subject_bbox, aspect_ratio_name):
-    """Simple, loose, natural crop with gentle rule-of-thirds lean."""
     height, width = image_shape[:2]
     ratio = ASPECT_RATIOS.get(aspect_ratio_name)
     if ratio is None:
@@ -253,8 +242,6 @@ def compute_crop_box(image_shape, subject_mask, subject_bbox, aspect_ratio_name)
         subject_cx = x + box_w / 2.0
         subject_cy = y + box_h / 2.0
 
-    # Crop size: subject takes ~38% of crop short side,
-    # but crop is at least 65% of the frame short side (generous context).
     subject_ref = max(box_w, box_h)
     crop_short = max(subject_ref / 0.38, min(width, height) * 0.65)
     crop_short = min(crop_short, min(width, height))
@@ -271,7 +258,6 @@ def compute_crop_box(image_shape, subject_mask, subject_bbox, aspect_ratio_name)
     if crop_h > height:
         crop_h = float(height); crop_w = crop_h * ratio
 
-    # Gentle thirds lean (not a hard snap)
     sx_norm = subject_cx / max(width  - 1, 1)
     sy_norm = subject_cy / max(height - 1, 1)
     anchor_x = 0.50 + (sx_norm - 0.50) * 0.20
@@ -321,7 +307,6 @@ def _subject_center(subject_mask):
 
 
 def preserve_subject_focus(original, refocused, subject_mask):
-    """Keep the chosen subject crisp while allowing the background to stay defocused."""
     mask = _soft_subject_mask(subject_mask)
     mask = mask[:, :, np.newaxis]
 
@@ -331,7 +316,6 @@ def preserve_subject_focus(original, refocused, subject_mask):
 
 
 def enhance_subject_separation(image, subject_mask):
-    """Push the eye toward the subject with softer background and a subtle vignette."""
     mask = _soft_subject_mask(subject_mask)
     mask3 = mask[:, :, np.newaxis]
 
@@ -353,14 +337,12 @@ def enhance_subject_separation(image, subject_mask):
 
 
 def create_augmented_image(original, refocused, subject_mask):
-    """Final subject-aware render used by the demo and CLI pipeline."""
     protected = preserve_subject_focus(original, refocused, subject_mask)
     separated = enhance_subject_separation(protected, subject_mask)
     return apply_style_enhancement(separated, subject_mask)
 
 
 def apply_style_enhancement(image, subject_mask=None):
-    """Lightweight subject-aware tone, color, and detail enhancement."""
     rgb8 = np.clip(image * 255.0, 0, 255).astype(np.uint8)
 
     lab = cv2.cvtColor(rgb8, cv2.COLOR_RGB2LAB)

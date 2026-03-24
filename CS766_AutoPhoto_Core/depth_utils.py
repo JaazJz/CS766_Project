@@ -6,7 +6,6 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'Depth-Anything-V2'))
 import config
 
-# Global model instance
 _depth_model = None
 _depth_import_error = None
 _fallback_notice_shown = False
@@ -37,7 +36,6 @@ def get_depth_model():
 
 
 def estimate_depth_fallback(image_path):
-    """Heuristic pseudo-depth when the learned model is unavailable."""
     global _fallback_notice_shown
 
     raw_img = cv2.imread(image_path)
@@ -76,46 +74,33 @@ def estimate_depth_fallback(image_path):
     return pseudo_depth.astype(np.float32)
 	
 def estimate_depth(image_path):
-    """Estimate depth using Depth-Anything V2"""
     try:
         model = get_depth_model()
     except Exception:
         return estimate_depth_fallback(image_path)
     
-    # Load image with OpenCV (BGR)
     raw_img = cv2.imread(image_path)
     if raw_img is None:
         raise ValueError(f"Failed to load image: {image_path}")
     
-    # Infer depth
     with torch.no_grad():
         depth = model.infer_image(raw_img)
     
     return depth
 
 def process_depth(image_path, target_width, target_height, depth_min, depth_max):
-    """Complete depth processing pipeline"""
-    # Estimate depth
     Z = estimate_depth(image_path).astype(np.float32)
     print(f"Original depth range: [{Z.min():.3f}, {Z.max():.3f}]")
     
-    # Normalize to 0-1
     Z = (Z - Z.min()) / (Z.max() - Z.min() + 1e-8)
-    
-    # Resize to match image
     Z = cv2.resize(Z, (target_width, target_height), interpolation=cv2.INTER_LINEAR)
     
-    # Smooth while preserving edges
     Z = cv2.bilateralFilter(Z, d=9, sigmaColor=0.05, sigmaSpace=5)
-    
-    # Map to real distances (exponential for realism)
     Z_real = depth_min * np.exp(Z * np.log(depth_max / depth_min))
     print(f"Mapped depth range: [{Z_real.min():.2f}m, {Z_real.max():.2f}m]")
     
-    # Clean up
     Z_real = np.clip(Z_real, depth_min, depth_max).astype(np.float32)
     
-    # OpenCV on some platforms does not support medianBlur for float depth maps
     Z_u16 = ((Z_real - depth_min) / (depth_max - depth_min) * 65535).astype(np.uint16)
     Z_u16 = cv2.medianBlur(Z_u16, 3)
     Z_real = Z_u16.astype(np.float32) / 65535.0 * (depth_max - depth_min) + depth_min
@@ -124,7 +109,6 @@ def process_depth(image_path, target_width, target_height, depth_min, depth_max)
 
 def compute_coc(depth_map, focal_length, f_number, focus_distance, 
                 sensor_width, image_width, max_blur):
-    """Calculate Circle of Confusion radius in pixels"""
     pixel_size = sensor_width / image_width
     f_m = focal_length / 1000.0
     aperture_diameter = focal_length / f_number
@@ -143,7 +127,6 @@ def compute_coc(depth_map, focal_length, f_number, focus_distance,
     return coc_radius.astype(np.float32)
 
 def select_focus_interactive(image, depth_map):
-    """Click to select focus point - Press Q or ESC to confirm"""
     H, W = image.shape[:2]
     selected = {'depth': depth_map[H//2, W//2], 'confirmed': False}
     
@@ -152,10 +135,8 @@ def select_focus_interactive(image, depth_map):
             selected['depth'] = depth_map[y, x]
             display = image.copy()
             
-            # Draw crosshair
             cv2.drawMarker(display, (x, y), (0, 1, 0), cv2.MARKER_CROSS, 30, 2)
             
-            # Big prominent text
             cv2.rectangle(display, (0, 0), (W, 80), (0, 0, 0), -1)  # Black background
             cv2.putText(display, f"Focus: {selected['depth']:.2f}m", (10, 35),
                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
@@ -165,14 +146,12 @@ def select_focus_interactive(image, depth_map):
             cv2.imshow('Select Focus', cv2.cvtColor((display*255).astype(np.uint8), cv2.COLOR_RGB2BGR))
             print(f"✓ Selected depth: {selected['depth']:.2f}m (press Q or ESC to confirm)")
         
-        # Double-click to confirm
         elif event == cv2.EVENT_LBUTTONDBLCLK:
             selected['confirmed'] = True
     
     cv2.namedWindow('Select Focus', cv2.WINDOW_NORMAL)
     cv2.setMouseCallback('Select Focus', mouse_callback)
     
-    # Initial display with clear instructions
     display = image.copy()
     cv2.rectangle(display, (0, 0), (W, 100), (0, 0, 0), -1)
     cv2.putText(display, "CLICK on object to focus", (10, 35),
@@ -185,7 +164,6 @@ def select_focus_interactive(image, depth_map):
     print("1. CLICK on the object you want to focus")
     print("2. Press 'Q' or 'ESC' to confirm and continue")
     
-    # Wait for key press or double-click
     while not selected['confirmed']:
         key = cv2.waitKey(100) & 0xFF
         if key in [ord('q'), ord('Q'), 27]:  # q, Q, or ESC

@@ -6,29 +6,24 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-# Add parent directory to path
 sys.path.insert(0, '.')
 
 import config
 from depth_utils import process_depth, select_focus_interactive
 
-# Configuration
 INPUT_FOLDER = "Image_Folder"
 OUTPUT_FOLDER = "Batch_Results"
 FOCUS_CACHE = "focus_settings.json"
 
-# Image extensions
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.JPG', '.JPEG', '.PNG'}
 
 
 def setup():
-    """Setup output folder"""
     Path(OUTPUT_FOLDER).mkdir(exist_ok=True)
     print(f"✓ Output folder: {OUTPUT_FOLDER}/\n")
 
 
 def find_images(folder):
-    """Find all images in folder"""
     if not os.path.exists(folder):
         print(f"❌ Folder not found: {folder}")
         sys.exit(1)
@@ -54,19 +49,15 @@ def stage1_select_all_focus(images):
         print("-" * 70)
         
         try:
-            # Load image
             img = np.array(Image.open(image_path).convert("RGB")).astype(np.float32) / 255.0
             H, W = img.shape[:2]
             
-            # Process depth
             print("  Processing depth...")
             depth_map = process_depth(image_path, W, H, config.DEPTH_MIN, config.DEPTH_MAX)
             
-            # Interactive selection
             print("  → Window will popup - CLICK to select focus, press Q")
             focus_distance = select_focus_interactive(img, depth_map)
             
-            # Save
             focus_settings[image_path] = float(focus_distance)
             print(f"  ✓ Saved: {focus_distance:.2f}m")
             
@@ -78,7 +69,6 @@ def stage1_select_all_focus(images):
             print(f"  ⚠ Skipping {filename}")
             continue
     
-    # Save to cache
     if focus_settings:
         with open(FOCUS_CACHE, 'w') as f:
             json.dump(focus_settings, f, indent=2)
@@ -103,23 +93,17 @@ def stage2_batch_process(focus_settings):
         print(f"\n[{i}/{total}] {filename} (focus: {focus_distance:.2f}m)")
         print("-" * 70)
         
-        # Process comparison mode
         comparison_out = os.path.join(OUTPUT_FOLDER, f"{stem}_comparison.png")
         print(f"  → Comparison mode...")
         success_comp = run_main(image_path, 'comparison', focus_distance, comparison_out)
         if success_comp:
             print(f"    ✓ {stem}_comparison.png")
         
-        # Process aperture mode (comment out to skip)
         aperture_out = os.path.join(OUTPUT_FOLDER, f"{stem}_apertures.png")
         print(f"  → Aperture mode...")
         success_aper = run_main(image_path, 'aperture', focus_distance, aperture_out)
         if success_aper:
             print(f"    ✓ {stem}_apertures.png")
-        
-        # Uncomment below to skip aperture mode:
-        # success_aper = True
-        # print(f"    ⊘ Skipped (disabled)")
         
         if success_comp and success_aper:
             success_count += 1
@@ -131,7 +115,6 @@ def stage2_batch_process(focus_settings):
     print(f"Successfully processed: {success_count}/{total} images")
     print(f"Results in: {OUTPUT_FOLDER}/")
     
-    # List outputs
     print("Generated files:")
     for f in sorted(os.listdir(OUTPUT_FOLDER)):
         if f.endswith(('.png', '.jpg')):
@@ -165,7 +148,6 @@ def run_main(image_path, mode, focus_distance, output_path):
         if result.returncode == 0:
             return True
         else:
-            # Print error details
             print(f"Failed with return code {result.returncode}")
             if result.stderr:
                 error_lines = result.stderr.strip().split('\n')
@@ -186,10 +168,8 @@ def main():
     print(f"Camera: {config.FOCAL_LENGTH}mm f/{config.F_NUMBER}")
     print(f"Model:  Depth-Anything V2 ({config.ENCODER})")
     
-    # Setup
     setup()
     
-    # Find images
     images = find_images(INPUT_FOLDER)
     if not images:
         print(f"No images found in {INPUT_FOLDER}/")
@@ -201,7 +181,6 @@ def main():
         print(f"  • {Path(img).name}")
     print()
     
-    # Check for existing focus settings
     if os.path.exists(FOCUS_CACHE):
         print(f"Found existing focus settings: {FOCUS_CACHE}")
         response = input("Use existing settings? (y/n): ").strip().lower()
@@ -217,7 +196,6 @@ def main():
         else:
             print("Starting fresh focus selection...\n")
     
-    # Stage 1: Select all focus points
     focus_settings = stage1_select_all_focus(images)
     
     if not focus_settings:
@@ -226,7 +204,6 @@ def main():
     
     response = input("Press ENTER to continue (or Ctrl+C to quit)...")
     
-    # Stage 2: Batch process
     stage2_batch_process(focus_settings)
 
 

@@ -30,7 +30,6 @@ from filter_utils import apply_film_filter, list_styles
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".JPG", ".JPEG", ".PNG", ".BMP", ".WEBP"}
 
-# Styles that get saved as separate outputs when --filter all is used
 _ALL_STYLES = list_styles()
 
 
@@ -96,13 +95,11 @@ def run_auto_augment(
     cropped_original = crop_array(image,         crop_box)
     cropped_subject  = crop_array(subject_mask,  crop_box)
 
-    # ── Tone/detail enhancement ───────────────────────────────────────────────
     if skip_enhance:
         base_image = cropped_result
     else:
         base_image = create_augmented_image(cropped_original, cropped_result, cropped_subject)
 
-    # ── Subject centre (used for vignette anchoring in filters) ───────────────
     mask_ys, mask_xs = np.where(cropped_subject > 0.15)
     if len(mask_xs):
         subj_cx = float(mask_xs.mean())
@@ -131,11 +128,9 @@ def run_auto_augment(
             seed=filter_seed,
         )
 
-    # ── Diagnostics overlay & summary ─────────────────────────────────────────
     overlay = create_overlay(image, saliency, subject_bbox=subject_bbox, crop_box=crop_box)
     summary = create_summary_panel(image, overlay, final_image)
 
-    # ── Save outputs ──────────────────────────────────────────────────────────
     stem = image_path.stem
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -148,7 +143,6 @@ def run_auto_augment(
     save_image(overlay,     str(overlay_path))
     save_image(summary,     str(summary_path))
 
-    # When --filter all: save every style as a separate file
     filter_outputs = {}
     if apply_all:
         print(f"Saving all {len(_ALL_STYLES)} film filter variants...")
